@@ -1,4 +1,4 @@
-# Makefile for POS application using ncurses
+# Makefile for POS application using ncurses and menu library
 
 # Compiler and flags
 CC = gcc

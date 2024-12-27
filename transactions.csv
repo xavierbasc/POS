@@ -1,75 +1,17 @@
-Ticket 1, Date: 2024-12-27 00:53:54, Total: 0.80
+Ticket 2, Agent: Default, Date: 2024-12-27 22:25:52, Total: 1.60
   001, Apple, 0.50
   002, Banana, 0.30
-Ticket 2, Date: 2024-12-27 00:54:33, Total: 2.00
   003, Orange, 0.80
-  004, Milk, 1.20
-Ticket 1, Date: 2024-12-27 01:02:26, Total: 2.10
-  001, Apple, 0.50
-  002, Banana, 0.30
-  001, Apple, 0.50
-  003, Orange, 0.80
-Ticket 1, Date: 2024-12-27 01:08:07, Total: 16.60
+Ticket 3, Agent: Default, Date: 2024-12-27 22:26:38, Total: 2.80
   001, Apple, 0.50
   002, Banana, 0.30
   003, Orange, 0.80
   004, Milk, 1.20
-  005, Bread, 1.50
+Ticket 4, Agent: Default, Date: 2024-12-27 22:26:55, Total: 0.50
   001, Apple, 0.50
+Ticket 5, Agent: Default, Date: 2024-12-27 22:27:10, Total: 0.30
   002, Banana, 0.30
-  003, Orange, 0.80
-  004, Milk, 1.20
-  001, Apple, 0.50
-  002, Banana, 0.30
-  003, Orange, 0.80
-  004, Milk, 1.20
-  002, Banana, 0.30
-  003, Orange, 0.80
-  001, Apple, 0.50
-  002, Banana, 0.30
-  003, Orange, 0.80
-  004, Milk, 1.20
-  001, Apple, 0.50
-  002, Banana, 0.30
-  003, Orange, 0.80
-  004, Milk, 1.20
-Ticket 1, Date: 2024-12-27 01:30:37, Total: 13.70
-  001, Apple, 0.50
-  002, Banana, 0.30
-  003, Orange, 0.80
-  004, Milk, 1.20
-  005, Bread, 1.50
-  006, Cheese, 2.50
-  001, Apple, 0.50
-  002, Banana, 0.30
-  003, Orange, 0.80
-  004, Milk, 1.20
-  001, Apple, 0.50
-  001, Apple, 0.50
-  001, Apple, 0.50
-  001, Apple, 0.50
-  001, Apple, 0.50
-  001, Apple, 0.50
-  002, Banana, 0.30
-  003, Orange, 0.80
-Ticket 1, Date: 2024-12-27 01:36:27, Total: 7.60
-  001, Apple, 0.50
-  001, Apple, 0.50
-  001, Apple, 0.50
-  002, Banana, 0.30
-  003, Orange, 0.80
-  004, Milk, 1.20
-  003, Orange, 0.80
-  002, Banana, 0.30
-  004, Milk, 1.20
-  005, Bread, 1.50
-Ticket 1, Date: 2024-12-27 02:10:41, Total: 2.80
-  001, Apple, 0.50
-  002, Banana, 0.30
-  003, Orange, 0.80
-  004, Milk, 1.20
-Ticket 1, Agent: Default, Date: 2024-12-27 02:12:43, Total: 2.80
-  001, Apple, 0.50
+Ticket 6, Agent: Default, Date: 2024-12-27 22:49:49, Total: 2.30
   002, Banana, 0.30
   003, Orange, 0.80
   004, Milk, 1.20
