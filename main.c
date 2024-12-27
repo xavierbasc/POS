@@ -19,13 +19,17 @@ typedef struct {
 Product catalog[MAX_PRODUCTS];
 int catalog_count = 0;
 
-bool beep_on_insert = false; // Configuration for beep
+bool beep_on_insert = false;
+char currency_symbol[10] = "$";
+bool hide_currency_symbol = false;
+bool currency_after_amount = false;
+
 bool authenticated = false;
 
 char agent_code[20] = "Default"; // Agent code
 time_t agent_login_time; // Time when the agent logged in
 
-// Function to load configuration from config.ini
+// Función para cargar configuración desde config.ini
 void load_config(const char *filename) {
     FILE *file = fopen(filename, "r");
     if (!file) {
@@ -33,16 +37,33 @@ void load_config(const char *filename) {
         return;
     }
 
-    char line[128];
+    char line[256];
     while (fgets(line, sizeof(line), file)) {
-        if (strncmp(line, "beep_on_insert=1", 16) == 0) {
+        // Eliminar espacios iniciales
+        char *trimmed_line = line;
+        while (isspace(*trimmed_line)) {
+            trimmed_line++;
+        }
+
+        // Ignorar líneas vacías o comentarios
+        if (*trimmed_line == '\0' || *trimmed_line == '#' || *trimmed_line == ';') {
+            continue;
+        }
+
+        // Parsear configuraciones
+        if (strncmp(trimmed_line, "beep_on_insert=1", 16) == 0) {
             beep_on_insert = true;
+        } else if (strncmp(trimmed_line, "currency_symbol=", 16) == 0) {
+            sscanf(trimmed_line + 16, "%9s", currency_symbol); // Lee hasta 9 caracteres para el símbolo
+        } else if (strncmp(trimmed_line, "hide_currency_symbol=1", 22) == 0) {
+            hide_currency_symbol = true;
+        } else if (strncmp(trimmed_line, "currency_after_amount=1", 23) == 0) {
+            currency_after_amount = true;
         }
     }
 
     fclose(file);
 }
-
 // Function to load products from a CSV file
 void load_products(const char *filename) {
     FILE *file = fopen(filename, "r");
@@ -211,7 +232,7 @@ void view_ticket_details(const char *filename, int ticket_id) {
     nodelay(stdscr, TRUE); // Restore non-blocking
 }
 
-// Función para listar y seleccionar un ticket sin memoria dinámica
+// Función para listar y seleccionar un ticket con paginación para miles de tickets (orden descendente)
 void list_tickets(const char *filename) {
     FILE *file = fopen(filename, "r");
     if (!file) {
@@ -221,13 +242,22 @@ void list_tickets(const char *filename) {
     }
 
     char line[256];
-    int ticket_ids[100];
+    int ticket_ids[1000];
+    char ticket_dates[1000][20];
+    char ticket_agents[1000][20];
+    float ticket_totals[1000];
     int ticket_count = 0;
 
-    while (fgets(line, sizeof(line), file) && ticket_count < 100) {
+    while (fgets(line, sizeof(line), file)) {
         int ticket_id;
-        if (sscanf(line, "Ticket %d,", &ticket_id) == 1) {
-            ticket_ids[ticket_count++] = ticket_id;
+        char date[20], agent[20];
+        float total;
+        if (sscanf(line, "Ticket %d, Agent: %19[^,], Date: %19[^,], Total: %f", &ticket_id, agent, date, &total) == 4) {
+            ticket_ids[ticket_count] = ticket_id;
+            strncpy(ticket_dates[ticket_count], date, sizeof(ticket_dates[ticket_count]) - 1);
+            strncpy(ticket_agents[ticket_count], agent, sizeof(ticket_agents[ticket_count]) - 1);
+            ticket_totals[ticket_count] = total;
+            ticket_count++;
         }
     }
 
@@ -241,19 +271,44 @@ void list_tickets(const char *filename) {
     }
 
     int current_selection = 0;
+    int page_size = LINES - 4; // Tamaño de la página menos espacio para encabezado
+    int page = 0;
+    int total_pages = (ticket_count + page_size - 1) / page_size;
     int ch;
+
     while (1) {
         erase(); // Clear screen without flickering
-        mvprintw(0, 0, "Seleccione un ticket (q para salir):");
-        for (int i = 0; i < ticket_count; i++) {
-            if (i == current_selection) {
+        mvprintw(0, 0, "Seleccione un ticket (q para salir, izquierda/derecha para cambiar página):");
+        mvprintw(1, 0, "%-10s %-20s %-20s %-10s", "Ticket ID", "Fecha", "Agente", "Total");
+        int start_index = ticket_count - 1 - (page * page_size);
+        int end_index = start_index - page_size;
+        if (end_index < -1) {
+            end_index = -1;
+        }
+
+        for (int i = start_index, row = 2; i > end_index; i--, row++) {
+            if (i == ticket_count - 1 - current_selection) {
                 attron(A_REVERSE);
-                mvprintw(i + 2, 0, "Ticket %d", ticket_ids[i]);
+                if (hide_currency_symbol) {
+                    mvprintw(row, 0, "%-10d %-20s %-20s %6.2f", ticket_ids[i], ticket_dates[i], ticket_agents[i], ticket_totals[i]);
+                } else if (currency_after_amount) {
+                    mvprintw(row, 0, "%-10d %-20s %-20s %6.2f %s", ticket_ids[i], ticket_dates[i], ticket_agents[i], ticket_totals[i], currency_symbol);
+                } else {
+                    mvprintw(row, 0, "%-10d %-20s %-20s %s%6.2f", ticket_ids[i], ticket_dates[i], ticket_agents[i], currency_symbol, ticket_totals[i]);
+                }
                 attroff(A_REVERSE);
             } else {
-                mvprintw(i + 2, 0, "Ticket %d", ticket_ids[i]);
+                if (hide_currency_symbol) {
+                    mvprintw(row, 0, "%-10d %-20s %-20s %6.2f", ticket_ids[i], ticket_dates[i], ticket_agents[i], ticket_totals[i]);
+                } else if (currency_after_amount) {
+                    mvprintw(row, 0, "%-10d %-20s %-20s %6.2f %s", ticket_ids[i], ticket_dates[i], ticket_agents[i], ticket_totals[i], currency_symbol);
+                } else {
+                    mvprintw(row, 0, "%-10d %-20s %-20s %s%6.2f", ticket_ids[i], ticket_dates[i], ticket_agents[i], currency_symbol, ticket_totals[i]);
+                }
             }
         }
+
+        mvprintw(LINES - 1, 0, "Página %d/%d", page + 1, total_pages);
 
         ch = getch();
         if (ch == 'q') {
@@ -261,13 +316,29 @@ void list_tickets(const char *filename) {
         } else if (ch == KEY_UP) {
             if (current_selection > 0) {
                 current_selection--;
+                if (current_selection < page * page_size) {
+                    page--;
+                }
             }
         } else if (ch == KEY_DOWN) {
             if (current_selection < ticket_count - 1) {
                 current_selection++;
+                if (current_selection >= (page + 1) * page_size) {
+                    page++;
+                }
+            }
+        } else if (ch == KEY_LEFT) {
+            if (page > 0) {
+                page--;
+                current_selection = page * page_size;
+            }
+        } else if (ch == KEY_RIGHT) {
+            if (page < total_pages - 1) {
+                page++;
+                current_selection = page * page_size;
             }
         } else if (ch == 10) { // Enter key
-            view_ticket_details(filename, ticket_ids[current_selection]);
+            view_ticket_details(filename, ticket_ids[ticket_count - 1 - current_selection]);
         }
     }
 }
@@ -510,6 +581,8 @@ int manage_menu() {
 
 int main() {
     Product *product = NULL;
+
+    load_config("config.ini");
 
     // Load products from CSV
     load_products("products.csv");

@@ -15,3 +15,70 @@ Ticket 6, Agent: Default, Date: 2024-12-27 22:49:49, Total: 2.30
   002, Banana, 0.30
   003, Orange, 0.80
   004, Milk, 1.20
+Ticket 7, Agent: Default, Date: 2024-12-27 23:10:47, Total: 2.80
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+Ticket 8, Agent: Default, Date: 2024-12-27 23:11:22, Total: 0.00
+Ticket 9, Agent: Default, Date: 2024-12-27 23:12:38, Total: 4.30
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+  005, Bread, 1.50
+Ticket 10, Agent: Default, Date: 2024-12-27 23:16:44, Total: 1.60
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+Ticket 11, Agent: Default, Date: 2024-12-27 23:16:47, Total: 2.30
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+Ticket 12, Agent: Default, Date: 2024-12-27 23:16:49, Total: 5.20
+  006, Cheese, 2.50
+  005, Bread, 1.50
+  004, Milk, 1.20
+Ticket 13, Agent: Default, Date: 2024-12-27 23:16:52, Total: 3.50
+  003, Orange, 0.80
+  004, Milk, 1.20
+  005, Bread, 1.50
+Ticket 14, Agent: Default, Date: 2024-12-27 23:16:54, Total: 3.50
+  003, Orange, 0.80
+  004, Milk, 1.20
+  005, Bread, 1.50
+Ticket 15, Agent: Default, Date: 2024-12-27 23:16:56, Total: 4.60
+  002, Banana, 0.30
+  007, Butter, 1.80
+  006, Cheese, 2.50
+Ticket 16, Agent: Default, Date: 2024-12-27 23:16:59, Total: 3.00
+  002, Banana, 0.30
+  004, Milk, 1.20
+  005, Bread, 1.50
+Ticket 17, Agent: Default, Date: 2024-12-27 23:17:02, Total: 2.70
+  009, Water, 0.70
+  003, Orange, 0.80
+  004, Milk, 1.20
+Ticket 18, Agent: Default, Date: 2024-12-27 23:19:35, Total: 4.30
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+  005, Bread, 1.50
+Ticket 19, Agent: Default, Date: 2024-12-27 23:19:57, Total: 10.90
+  005, Bread, 1.50
+  004, Milk, 1.20
+  003, Orange, 0.80
+  006, Cheese, 2.50
+  007, Butter, 1.80
+  004, Milk, 1.20
+  003, Orange, 0.80
+  002, Banana, 0.30
+  003, Orange, 0.80
+Ticket 20, Agent: Default, Date: 2024-12-27 23:25:13, Total: 6.80
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+  005, Bread, 1.50
+  006, Cheese, 2.50
