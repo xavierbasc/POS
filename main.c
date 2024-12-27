@@ -21,6 +21,8 @@ Product catalog[MAX_PRODUCTS];
 int catalog_count = 0;
 
 bool beep_on_insert = false; // Configuration for beep
+bool authenticated = false;
+
 char agent_code[20] = "Default"; // Agent code
 time_t agent_login_time; // Time when the agent logged in
 
@@ -221,6 +223,8 @@ int manage_menu() {
 }
 
 int main() {
+    Product *product = NULL;
+
     // Load products from CSV
     load_products("products.csv");
 
@@ -235,10 +239,12 @@ int main() {
     // Define colors
     init_color(COLOR_CYAN, 100, 100, 100); // Gris claro (escala de 0 a 1000)
     init_color(COLOR_BLUE, 0, 0, 500); // Gris claro (escala de 0 a 1000)
+    init_color(COLOR_YELLOW, 1000, 1000, 0); // Gris claro (escala de 0 a 1000)
 
     init_pair(1, COLOR_GREEN, COLOR_BLACK);
     init_pair(2, COLOR_WHITE, COLOR_CYAN);
     init_pair(3, COLOR_WHITE, COLOR_BLUE);
+    init_pair(4, COLOR_YELLOW, COLOR_BLUE);
 
     char query1[50] = "";
     char query2[50] = "";
@@ -258,7 +264,7 @@ int main() {
         getmaxyx(stdscr, max_y, max_x);
 
         // Draw vertical separator
-        for (int y = 0; y < max_y-1; y++) {
+        for (int y = 2; y < max_y-2; y++) {
             mvaddch(y, max_x / 2, ACS_VLINE);
         }
 
@@ -276,26 +282,30 @@ int main() {
         int seconds = duration % 60;
 
         // Left panel for input
-        mvprintw(0, 1, "Agent: %s (%02d:%02d:%02d)", agent_code, hours, minutes, seconds);
+        if (!authenticated)
+            mvprintw(0, 1, "Agent: - no agent -");
+        else
+            mvprintw(0, 1, "Agent: %s (%02d:%02d:%02d)", agent_code, hours, minutes, seconds);
 
         mvprintw(2, 1, "CODE: ");
-        mvchgat(2, 1, 1, A_UNDERLINE, 0, NULL);
-        mvprintw(3, 1, "NAME: ");
-        mvchgat(3, 1, 1, A_UNDERLINE, 0, NULL);
-        mvprintw(3, 10, "%2s", query2);
+        //mvprintw(4, 10, "%2s", query2);
+        //mvchgat(2, 1, 1, A_UNDERLINE, 0, NULL);
+        
+        mvprintw(4, 1, "Product: %s", (query1[0]=='\0' || product==NULL)?"":product->name);
+        mvprintw(5, 1, "Price: %.2f", (query1[0]=='\0' || product==NULL)?0.0:product->price);
 
         attron(COLOR_PAIR(2));
-        mvprintw(2, 6, "%20s", query1);
+        mvprintw(2, 7, "%19s", query1);
         attroff(COLOR_PAIR(2));
 
         // Right panel for shopping cart
         int x_offset = max_x / 2 + 2;
         attron(COLOR_PAIR(1));
-        mvprintw(0, x_offset, "Total ticket: %.2f", total);
+        mvprintw(0, x_offset, "  Total ticket: %.2f", total);
         attroff(COLOR_PAIR(1));
 
         for (int i = scroll_offset; i < cart_count && i - scroll_offset < max_y - 3; i++) {
-            mvprintw((i - scroll_offset) + 2, x_offset, "%03d. %-15s - %.2f", i + 1, shopping_cart[i]->name, shopping_cart[i]->price);
+            mvprintw((i - scroll_offset) + 2, x_offset, "%c %03d. %-15s - %.2f", (i+1)==cart_count?'>':' ' , i + 1, shopping_cart[i]->name, shopping_cart[i]->price);
         }
 
         // Footer
@@ -309,7 +319,23 @@ int main() {
 #endif
 
         attron(COLOR_PAIR(3));
-        mvprintw(max_y - 1, 0, "[P] Pay | [D] Delete | [A] Agent | [M] Management");
+
+        // Draw horizontal
+        for (int x = 0; x < max_x / 2; x++) {
+            mvaddch(max_y - 1, x, ' ');
+        }
+        for (int x = max_x / 2 + 1; x < max_x ; x++) {
+            mvaddch(max_y - 1, x, ' ');
+        }
+
+        mvprintw(max_y - 1, 0, " Agent  Management");
+        mvchgat(max_y - 1, 1, 1, A_COLOR, 4, NULL); // BACKGROUND COLOR
+        mvchgat(max_y - 1, 8, 1, A_COLOR, 4, NULL); // BACKGROUND COLOR
+
+        mvprintw(max_y - 1, max_x / 2 + 1, " Pay  Delete ");
+        mvchgat(max_y - 1, max_x / 2 + 2, 1, A_COLOR, 4, NULL); // BACKGROUND COLOR
+        mvchgat(max_y - 1, max_x / 2 + 7, 1, A_COLOR, 4, NULL); // BACKGROUND COLOR
+
 
         // Scroll instructions if needed
         if (cart_count > max_y - 3) {
@@ -336,17 +362,18 @@ int main() {
             if (ch == ch == 'M' || ch == 'm') {
                 ch = manage_menu();
                 clear(); // Clear the main window after returning from the menu
-            } 
-            
+            }
+
+            int l = strlen(query1);
+            char text[50] = "";
+            strcpy(text, query1);
+            text[l] = (char)ch;
+            text[l + 1] = '\0';
+            product = search_product(text);
+
             if (ch == 10) { // ENTER key
-                Product *product = NULL;
-                if (input_mode == 1 && strlen(query1) > 0) {
-                    product = search_product(query1);
-                    query1[0] = '\0'; // Clear the input field
-                } else if (input_mode == 2 && strlen(query2) > 0) {
-                    product = search_product(query2);
-                    query2[0] = '\0'; // Clear the input field
-                }
+                product = search_product(query1);
+                query1[0] = '\0'; // Clear the input field
 
                 if (product) {
                     shopping_cart[cart_count++] = product;
@@ -354,10 +381,9 @@ int main() {
                     if (beep_on_insert) {
                         beep();
                     }
-                    beep();
 
                 } else {
-                    mvprintw(max_y - 2, 0, "Product not found. Press any key to continue...");
+                    mvprintw(max_y - 2, 0, "Product not found. Press key ...");
                     nodelay(stdscr, FALSE); // Temporarily block
                     getch();
                     nodelay(stdscr, TRUE); // Restore non-blocking
@@ -370,10 +396,10 @@ int main() {
                 getstr(product_name);
                 nodelay(stdscr, TRUE); // Restore non-blocking
             } else if (ch == 'A' || ch == 'a') { // Change agent code
-                mvprintw(max_y - 3, 0, "Enter agent code: ");
+                mvprintw(max_y - 3, 0, "Enter agent code (ENTER='no agent'): ");
                 echo();
-                char new_agent_code[20];                
-                char psw[20];                
+                char new_agent_code[20];
+                char psw[20];
                 nodelay(stdscr, FALSE); // Temporarily block
                 getstr(new_agent_code);
                 mvprintw(max_y - 3, 0, "Enter agent password:                  ");
@@ -385,8 +411,9 @@ int main() {
                     strncpy(agent_code, new_agent_code, sizeof(agent_code) - 1);
                     agent_code[sizeof(agent_code) - 1] = '\0';
                     agent_login_time = time(NULL); // Record the login time
+                    authenticated = true;
                 } else {
-                    mvprintw(max_y - 2, 0, "Invalid agent code. Press any key to continue...");
+                    mvprintw(max_y - 2, 0, "Invalid agent code.");
                     nodelay(stdscr, FALSE); // Temporarily block
                     getch();
                     nodelay(stdscr, TRUE); // Restore non-blocking
@@ -402,36 +429,44 @@ int main() {
                     total = 0.0;
                 }
             } else if (ch == 'D' || ch == 'd') { // Delete item
-                mvprintw(max_y - 3, 0, "Enter position to delete: ");
+                mvprintw(max_y - 3, max_x / 2 + 2, "POS to delete (last by default): ");
                 echo();
                 char pos_input[10];
                 nodelay(stdscr, FALSE); // Temporarily block
                 getstr(pos_input);
                 nodelay(stdscr, TRUE); // Restore non-blocking
                 noecho();
-                int pos = atoi(pos_input) - 1;
+                int pos;
+                if (strlen(pos_input)==0) { pos = cart_count - 1; }
+                else pos = atoi(pos_input) - 1;
                 if (pos >= 0 && pos < cart_count) {
-                    mvprintw(max_y - 2, 0, "Delete %s (%s)? (y/N): ", shopping_cart[pos]->name, shopping_cart[pos]->code);
+                    mvprintw(max_y - 2, max_x / 2 + 2, "Delete %s (%s)? (Y/n): ", shopping_cart[pos]->name, shopping_cart[pos]->code);
                     nodelay(stdscr, FALSE); // Temporarily block
                     int confirm = getch();
                     nodelay(stdscr, TRUE); // Restore non-blocking
-                    if (confirm == 'y' || confirm == 'Y') {
+                    if (confirm != 'n' && confirm != 'N') {
                         total -= shopping_cart[pos]->price;
                         for (int i = pos; i < cart_count - 1; i++) {
                             shopping_cart[i] = shopping_cart[i + 1];
                         }
                         cart_count--;
-                        mvprintw(max_y - 2, 0, "Item removed successfully. Press any key to continue...");
                     } else {
-                        mvprintw(max_y - 2, 0, "Item not removed. Press any key to continue...");
+                        mvprintw(max_y - 2, max_x / 2 + 2, "Item not removed. Press key ...");
+                        curs_set(0);
+                        nodelay(stdscr, FALSE);
+                        getch();
+                        nodelay(stdscr, TRUE);
+                        curs_set(1);
                     }
                 } else {
-                    mvprintw(max_y - 2, 0, "Invalid position. Press any key to continue...");
+                    mvprintw(max_y - 2, max_x / 2 + 2, "Invalid position. Press key ...");
+                    curs_set(0);
+                    nodelay(stdscr, FALSE);
+                    getch();
+                    nodelay(stdscr, TRUE);
+                    curs_set(1);
                 }
 
-                nodelay(stdscr, FALSE); // Temporarily block
-                getch();
-                nodelay(stdscr, TRUE); // Restore non-blocking
             } else if (ch == KEY_BACKSPACE || ch == 127) { // BACKSPACE key
                 if (input_mode == 1 && strlen(query1) > 0) {
                     query1[strlen(query1) - 1] = '\0';
