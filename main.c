@@ -9,16 +9,25 @@
 
 // Define the structure for products
 typedef struct {
-    char code[10];
-    char name[50];
-    float price;
+    int    ID;
+    char   EAN13[14];         // Código EAN13: 13 caracteres + terminador nulo
+    char   product[50];
+    float  price;
+    int    stock;
+    float  price01;
+    float  price02;
+    float  price03;
+    float  price04;
+    char   fabricante[50];    // Fabricante
+    char   proveedor[50];     // Proveedor
+    char   departamento[50];  // Departamento
+    char   clase[50];         // Clase
+    char   subclase[50];      // Subclase
+    char   tipo_IVA[20];      // Tipo de IVA: "reducido" o "super reducido"
 } Product;
 
-// Product catalog
-#define MAX_PRODUCTS 10000
-Product catalog[MAX_PRODUCTS];
-int catalog_count = 0;
 
+// Configuración y otras variables globales
 bool beep_on_insert = false;
 char currency_symbol[10] = "$";
 bool hide_currency_symbol = false;
@@ -64,24 +73,87 @@ void load_config(const char *filename) {
 
     fclose(file);
 }
-// Function to load products from a CSV file
-void load_products(const char *filename) {
-    FILE *file = fopen(filename, "r");
+
+// Función para buscar un producto en el archivo binario
+bool search_product_disk(const char *query, Product *result) {
+    FILE *file = fopen("products.dat", "rb");
     if (!file) {
-        perror("Error opening product file");
-        exit(EXIT_FAILURE);
+        perror("Error opening binary product file");
+        return false;
     }
 
-    char line[128];
-    while (fgets(line, sizeof(line), file) && catalog_count < MAX_PRODUCTS) {
-        sscanf(line, "%9[^,],%49[^,],%f", catalog[catalog_count].code, catalog[catalog_count].name, &catalog[catalog_count].price);
-        catalog_count++;
+    Product temp;
+    while (fread(&temp, sizeof(Product), 1, file) == 1) {
+        if (strstr(temp.product, query) || strstr(temp.product, query)) { // Puedes ajustar para code o name
+            *result = temp;
+            fclose(file);
+            return true;
+        }
     }
 
     fclose(file);
+    return false;
 }
 
-// Function to validate agent and password from a CSV file
+// Función para añadir un producto al archivo binario
+bool add_product_disk(const Product *prod) {
+    FILE *file = fopen("products.dat", "ab");
+    if (!file) {
+        perror("Error opening binary product file for appending");
+        return false;
+    }
+
+    if (fwrite(prod, sizeof(Product), 1, file) != 1) {
+        perror("Error writing product to binary file");
+        fclose(file);
+        return false;
+    }
+
+    fclose(file);
+    return true;
+}
+
+// Función para eliminar un producto del archivo binario
+bool delete_product_disk(int ID) {
+    FILE *file = fopen("products.dat", "rb");
+    if (!file) {
+        perror("Error opening binary product file for reading");
+        return false;
+    }
+
+    FILE *temp = fopen("temp.dat", "wb");
+    if (!temp) {
+        perror("Error opening temporary file for writing");
+        fclose(file);
+        return false;
+    }
+
+    Product prod;
+    bool found = false;
+    while (fread(&prod, sizeof(Product), 1, file) == 1) {
+        if (prod.ID == ID) {
+            found = true;
+            continue; // Saltar el producto a eliminar
+        }
+        fwrite(&prod, sizeof(Product), 1, temp);
+    }
+
+    fclose(file);
+    fclose(temp);
+
+    if (found) {
+        // Reemplazar el archivo original con el temporal
+        remove("products.dat");
+        rename("temp.dat", "products.dat");
+    } else {
+        // Si no se encontró, eliminar el archivo temporal
+        remove("temp.dat");
+    }
+
+    return found;
+}
+
+// Función para validar agente y contraseña desde un CSV
 bool validate_agent_and_password(const char *filename, const char *code, const char *password) {
     FILE *file = fopen(filename, "r");
     if (!file) {
@@ -104,23 +176,23 @@ bool validate_agent_and_password(const char *filename, const char *code, const c
     return false;
 }
 
-// Function to read the last ID from a file
+// Función para leer el último ID desde un archivo
 int read_last_id(const char *filename) {
     FILE *file = fopen(filename, "r");
     if (!file) {
-        return 1; // Default to 1 if the file doesn't exist
+        return 1001; // Iniciar desde 1001 si el archivo no existe
     }
 
     int last_id;
     if (fscanf(file, "%d", &last_id) != 1) {
-        last_id = 1; // Default to 1 if the file is empty or invalid
+        last_id = 1000; // Iniciar desde 1001 si el archivo está vacío o es inválido
     }
 
     fclose(file);
     return last_id;
 }
 
-// Function to update the last ID in a file
+// Función para actualizar el último ID en un archivo
 void update_last_id(const char *filename, int last_id) {
     FILE *file = fopen(filename, "w");
     if (!file) {
@@ -132,7 +204,7 @@ void update_last_id(const char *filename, int last_id) {
     fclose(file);
 }
 
-// Function to append a transaction to a CSV file
+// Función para guardar una transacción en un archivo CSV
 void save_transaction(const char *filename, Product **cart, int count, float total) {
     static const char *id_filename = "last_id.txt";
     int ticket_id = read_last_id(id_filename);
@@ -150,7 +222,7 @@ void save_transaction(const char *filename, Product **cart, int count, float tot
 
     fprintf(file, "Ticket %d, Agent: %s, Date: %s, Total: %.2f\n", ticket_id, agent_code, datetime, total);
     for (int i = 0; i < count; i++) {
-        fprintf(file, "  %s, %s, %.2f\n", cart[i]->code, cart[i]->name, cart[i]->price);
+        fprintf(file, "  %s, %s, %.2f\n", cart[i]->product, cart[i]->product, cart[i]->price);
     }
 
     fclose(file);
@@ -159,27 +231,17 @@ void save_transaction(const char *filename, Product **cart, int count, float tot
     update_last_id(id_filename, ticket_id + 1);
 }
 
-
-// Function to search for a product by code or name
-Product *search_product(const char *query) {
-    for (int i = 0; i < catalog_count; i++) {
-        if (strstr(catalog[i].code, query) || strstr(catalog[i].name, query)) {
-            return &catalog[i];
-        }
-    }
-    return NULL;
-}
-
+// Función para obtener una contraseña de manera segura
 void get_password(int x, int y, char *buffer, size_t max_len) {
     size_t i = 0;
     int ch;
 
-    while ((ch = getch()) != '\n' && i < max_len - 1) { // Leer hasta ENTER o llenar el buffer
+    while ((ch = getch()) != '\n' && ch != KEY_ENTER && i < max_len - 1) { // Leer hasta ENTER o llenar el buffer
         if (ch == KEY_BACKSPACE || ch == 127) { // Manejar BACKSPACE
             if (i > 0) {
                 i--;
-                mvaddch(x , y + i, ' '); // Borrar el último asterisco
-                move(x , y + i); // Mover el cursor atrás
+                mvaddch(x, y + i, ' '); // Borrar el último asterisco
+                move(x, y + i); // Mover el cursor atrás
             }
         } else if (isprint(ch)) { // Solo caracteres imprimibles
             buffer[i++] = ch;
@@ -255,9 +317,12 @@ void list_tickets(const char *filename) {
         if (sscanf(line, "Ticket %d, Agent: %19[^,], Date: %19[^,], Total: %f", &ticket_id, agent, date, &total) == 4) {
             ticket_ids[ticket_count] = ticket_id;
             strncpy(ticket_dates[ticket_count], date, sizeof(ticket_dates[ticket_count]) - 1);
+            ticket_dates[ticket_count][sizeof(ticket_dates[ticket_count]) - 1] = '\0';
             strncpy(ticket_agents[ticket_count], agent, sizeof(ticket_agents[ticket_count]) - 1);
+            ticket_agents[ticket_count][sizeof(ticket_agents[ticket_count]) - 1] = '\0';
             ticket_totals[ticket_count] = total;
             ticket_count++;
+            if (ticket_count >= 1000) break; // Limitar a 1000 tickets
         }
     }
 
@@ -286,7 +351,7 @@ void list_tickets(const char *filename) {
             end_index = -1;
         }
 
-        for (int i = start_index, row = 2; i > end_index; i--, row++) {
+        for (int i = start_index, row = 2; i > end_index && i >= 0; i--, row++) {
             if (i == ticket_count - 1 - current_selection) {
                 attron(A_REVERSE);
                 if (hide_currency_symbol) {
@@ -343,34 +408,7 @@ void list_tickets(const char *filename) {
     }
 }
 
-// Función para guardar productos en CSV
-void save_products_to_csv(const char *filename) {
-    FILE *file = fopen(filename, "w");
-    if (!file) {
-        mvprintw(0, 0, "Error al guardar productos en el archivo");
-        getch();
-        return;
-    }
-    for (int i = 0; i < 100; i++) {
-        fprintf(file, "Producto%d,%.2f\n", i + 1, 10.0 + i);
-    }
-    fclose(file);
-}
-
-// Función para guardar usuarios en CSV
-void save_users_to_csv(const char *filename) {
-    FILE *file = fopen(filename, "w");
-    if (!file) {
-        mvprintw(0, 0, "Error al guardar usuarios en el archivo");
-        getch();
-        return;
-    }
-    for (int i = 0; i < 100; i++) {
-        fprintf(file, "Usuario%d\n", i + 1);
-    }
-    fclose(file);
-}
-
+// Función para mostrar una ventana de confirmación
 bool show_window(const char *msg) {
     curs_set(0);
 
@@ -414,127 +452,210 @@ bool show_window(const char *msg) {
     return(respuesta_si);
 }
 
-
-
-// Función para gestionar productos
+// Función para gestionar productos directamente en el archivo binario
 void manage_products() {
     clear();
-    mvprintw(0, 0, "Gestión de Productos");
-    mvprintw(2, 0, "1. Ver productos");
-    mvprintw(3, 0, "2. Añadir producto");
-    mvprintw(4, 0, "3. Eliminar producto");
-    mvprintw(5, 0, "q. Salir");
+    mvprintw(0, 0, "Product Management");
+    mvprintw(2, 0, "1. View products");
+    mvprintw(3, 0, "2. Add product");
+    mvprintw(4, 0, "3. Delete product");
+    mvprintw(5, 0, "q. Exit");
 
     int ch;
     while ((ch = getch()) != 'q') {
         switch (ch) {
-            case '1':
+            case '1': { // View products
                 clear();
-                mvprintw(0, 0, "Lista de Productos:");
-                for (int i = 0; i < 100; i++) {
-                    mvprintw(i + 2, 0, "Producto %d", i + 1);
+                mvprintw(0, 0, "Product List:");
+                mvprintw(1, 0, "ID\tProduct\t\tPrice\tStock");
+                mvprintw(2, 0, "----------------------------------------------");
+
+                FILE *file = fopen("products.dat", "rb");
+                if (!file) {
+                    mvprintw(4, 0, "No products found.");
+                    mvprintw(5, 0, "Press any key to continue...");
+                    nodelay(stdscr, FALSE);
+                    getch();
+                    nodelay(stdscr, TRUE);
+                    break;
                 }
-                mvprintw(20, 0, "Presione cualquier tecla para continuar...");
-                nodelay(stdscr, FALSE); // Temporarily block
+
+                Product prod;
+                int row = 3;
+                while (fread(&prod, sizeof(Product), 1, file) == 1) {
+                    mvprintw(row++, 0, "%d\t%-15s\t%.2f\t%d", prod.ID, prod.product, prod.price, prod.stock);
+                    if (row >= LINES - 2) break; // Evitar desbordamiento de pantalla
+                }
+
+                fclose(file);
+
+                mvprintw(row + 1, 0, "Press any key to continue...");
+                nodelay(stdscr, FALSE);
                 getch();
-                nodelay(stdscr, TRUE); // Restore non-blocking
+                nodelay(stdscr, TRUE);
                 break;
-            case '2':
+            }
+            case '2': { // Add product
                 clear();
-                mvprintw(0, 0, "Añadir Producto:");
-                mvprintw(2, 0, "Nombre:");
+                mvprintw(0, 0, "Add New Product:");
+
                 char name[50];
+                float price;
+                int stock;
+                float price01, price02, price03, price04;
+
+                mvprintw(2, 0, "Product Name: ");
                 echo();
                 getstr(name);
                 noecho();
-                mvprintw(4, 0, "Producto añadido: %s", name);
-                save_products_to_csv("productos.csv");
-                nodelay(stdscr, FALSE); // Temporarily block
-                getch();
-                nodelay(stdscr, TRUE); // Restore non-blocking
-                break;
-            case '3':
-                clear();
-                mvprintw(0, 0, "Eliminar Producto:");
-                mvprintw(2, 0, "ID:");
-                char id[10];
+
+                mvprintw(3, 0, "Price: ");
                 echo();
-                getstr(id);
+                scanw("%f", &price);
                 noecho();
-                mvprintw(4, 0, "Producto eliminado: %s", id);
-                save_products_to_csv("productos.csv");
-                nodelay(stdscr, FALSE); // Temporarily block
+
+                mvprintw(4, 0, "Stock: ");
+                echo();
+                scanw("%d", &stock);
+                noecho();
+
+                mvprintw(5, 0, "Price01: ");
+                echo();
+                scanw("%f", &price01);
+                noecho();
+
+                mvprintw(6, 0, "Price02: ");
+                echo();
+                scanw("%f", &price02);
+                noecho();
+
+                mvprintw(7, 0, "Price03: ");
+                echo();
+                scanw("%f", &price03);
+                noecho();
+
+                mvprintw(8, 0, "Price04: ");
+                echo();
+                scanw("%f", &price04);
+                noecho();
+
+                // Obtener el último ID y asignar uno nuevo
+                int last_id = read_last_id("last_id.txt");
+                Product new_prod;
+                new_prod.ID = last_id + 1;
+                strncpy(new_prod.product, name, sizeof(new_prod.product) - 1);
+                new_prod.product[sizeof(new_prod.product) - 1] = '\0';
+                new_prod.price = price;
+                new_prod.stock = stock;
+                new_prod.price01 = price01;
+                new_prod.price02 = price02;
+                new_prod.price03 = price03;
+                new_prod.price04 = price04;
+
+                if (add_product_disk(&new_prod)) {
+                    update_last_id("last_id.txt", new_prod.ID);
+                    mvprintw(10, 0, "Product added successfully with ID %d.", new_prod.ID);
+                } else {
+                    mvprintw(10, 0, "Failed to add product.");
+                }
+
+                mvprintw(12, 0, "Press any key to continue...");
+                nodelay(stdscr, FALSE);
                 getch();
-                nodelay(stdscr, TRUE); // Restore non-blocking
+                nodelay(stdscr, TRUE);
                 break;
+            }
+            case '3': { // Delete product
+                clear();
+                mvprintw(0, 0, "Delete Product:");
+
+                int del_id;
+                mvprintw(2, 0, "Enter Product ID to delete: ");
+                echo();
+                scanw("%d", &del_id);
+                noecho();
+
+                if (delete_product_disk(del_id)) {
+                    mvprintw(4, 0, "Product with ID %d deleted successfully.", del_id);
+                } else {
+                    mvprintw(4, 0, "Product with ID %d not found.", del_id);
+                }
+
+                mvprintw(6, 0, "Press any key to continue...");
+                nodelay(stdscr, FALSE);
+                getch();
+                nodelay(stdscr, TRUE);
+                break;
+            }
         }
         erase(); // Clear screen without flickering
-        mvprintw(0, 0, "Gestión de Productos");
-        mvprintw(2, 0, "1. Ver productos");
-        mvprintw(3, 0, "2. Añadir producto");
-        mvprintw(4, 0, "3. Eliminar producto");
-        mvprintw(5, 0, "q. Salir");
+        mvprintw(0, 0, "Product Management");
+        mvprintw(2, 0, "1. View products");
+        mvprintw(3, 0, "2. Add product");
+        mvprintw(4, 0, "3. Delete product");
+        mvprintw(5, 0, "q. Exit");
     }
 }
 
-// Función para gestionar usuarios
+// Función para gestionar usuarios (sin cambios, ya que no está relacionado con los productos)
 void manage_users() {
     clear();
-    mvprintw(0, 0, "Gestión de Usuarios");
-    mvprintw(2, 0, "1. Ver usuarios");
-    mvprintw(3, 0, "2. Añadir usuario");
-    mvprintw(4, 0, "3. Eliminar usuario");
-    mvprintw(5, 0, "q. Salir");
+    mvprintw(0, 0, "User Management");
+    mvprintw(2, 0, "1. View users");
+    mvprintw(3, 0, "2. Add user");
+    mvprintw(4, 0, "3. Delete user");
+    mvprintw(5, 0, "q. Exit");
 
     int ch;
     while ((ch = getch()) != 'q') {
         switch (ch) {
             case '1':
                 clear();
-                mvprintw(0, 0, "Lista de Usuarios:");
+                mvprintw(0, 0, "User List:");
+                mvprintw(1, 0, "User ID\tUsername");
+                mvprintw(2, 0, "--------------------------");
                 for (int i = 0; i < 100; i++) {
-                    mvprintw(i + 2, 0, "Usuario %d", i + 1);
+                    mvprintw(i + 3, 0, "%d\tUser%d", i + 1, i + 1);
                 }
-                mvprintw(20, 0, "Presione cualquier tecla para continuar...");
-                nodelay(stdscr, FALSE); // Temporarily block
+                mvprintw(104, 0, "Press any key to continue...");
+                nodelay(stdscr, FALSE);
                 getch();
-                nodelay(stdscr, TRUE); // Restore non-blocking
+                nodelay(stdscr, TRUE);
                 break;
             case '2':
                 clear();
-                mvprintw(0, 0, "Añadir Usuario:");
-                mvprintw(2, 0, "Nombre:");
-                char name[50];
+                mvprintw(0, 0, "Add New User:");
+                char username[20];
                 echo();
-                getstr(name);
+                getstr(username);
                 noecho();
-                mvprintw(4, 0, "Usuario añadido: %s", name);
-                save_users_to_csv("usuarios.csv");
-                nodelay(stdscr, FALSE); // Temporarily block
+                mvprintw(2, 0, "User added: %s", username);
+                mvprintw(4, 0, "Press any key to continue...");
+                nodelay(stdscr, FALSE);
                 getch();
-                nodelay(stdscr, TRUE); // Restore non-blocking
+                nodelay(stdscr, TRUE);
                 break;
             case '3':
                 clear();
-                mvprintw(0, 0, "Eliminar Usuario:");
-                mvprintw(2, 0, "ID:");
-                char id[10];
+                mvprintw(0, 0, "Delete User:");
+                int user_id;
                 echo();
-                getstr(id);
+                mvprintw(2, 0, "Enter User ID to delete: ");
+                scanw("%d", &user_id);
                 noecho();
-                mvprintw(4, 0, "Usuario eliminado: %s", id);
-                save_users_to_csv("usuarios.csv");
-                nodelay(stdscr, FALSE); // Temporarily block
+                mvprintw(4, 0, "User with ID %d deleted.", user_id);
+                mvprintw(6, 0, "Press any key to continue...");
+                nodelay(stdscr, FALSE);
                 getch();
-                nodelay(stdscr, TRUE); // Restore non-blocking
+                nodelay(stdscr, TRUE);
                 break;
         }
         erase(); // Clear screen without flickering
-        mvprintw(0, 0, "Gestión de Usuarios");
-        mvprintw(2, 0, "1. Ver usuarios");
-        mvprintw(3, 0, "2. Añadir usuario");
-        mvprintw(4, 0, "3. Eliminar usuario");
-        mvprintw(5, 0, "q. Salir");
+        mvprintw(0, 0, "User Management");
+        mvprintw(2, 0, "1. View users");
+        mvprintw(3, 0, "2. Add user");
+        mvprintw(4, 0, "3. Delete user");
+        mvprintw(5, 0, "q. Exit");
     }
 }
 
@@ -599,7 +720,8 @@ int manage_menu() {
                     delwin(menu_win);
                     manage_products();
                     return 0;
-                } if (highlight == 1) {
+                } 
+                if (highlight == 1) {
                     delwin(menu_win);
                     manage_users();
                     return 0;
@@ -607,7 +729,7 @@ int manage_menu() {
                     delwin(menu_win);
                     list_tickets("transactions.csv");
                     return 0;
-                } else if (highlight == n_choices - 1 || highlight == 3) { // Exit
+                } else if (highlight == 3 || highlight == n_choices - 1) { // Exit
                     delwin(menu_win);
                     return 'q';
                 } else {
@@ -633,14 +755,13 @@ void finish(void) {
     exit(0);
 }
 
-
+// Función principal
 int main() {
-    Product *product = NULL;
+    Product product;
 
     load_config("config.ini");
 
-    // Load products from CSV
-    load_products("products.csv");
+    // No cargamos productos en memoria, trabajamos directamente con el archivo binario
 
     // Initialize ncurses
     initscr();
@@ -692,9 +813,9 @@ int main() {
 
         // Esquinas
         mvaddch(1, 0, ACS_ULCORNER);                         // esquina sup izq
-        mvaddch(1, max_x - 1, ACS_URCORNER);             // esquina sup der
-        mvaddch(max_y - 2, 0, ACS_LLCORNER);            // esquina inf izq
-        mvaddch(max_y - 2, max_x - 1, ACS_LRCORNER);// esquina inf der
+        mvaddch(1, max_x - 1, ACS_URCORNER);                 // esquina sup der
+        mvaddch(max_y - 2, 0, ACS_LLCORNER);                // esquina inf izq
+        mvaddch(max_y - 2, max_x - 1, ACS_LRCORNER);        // esquina inf der
 
         mvaddch(1, max_x/2, ACS_TTEE);
         mvaddch(max_y - 2, max_x/2, ACS_BTEE);
@@ -721,11 +842,20 @@ int main() {
 
         mvprintw(2, 1, "CODE: ");
         mvprintw(2, 21, "EAN13");
-        //mvprintw(4, 10, "%2s", query2);
-        //mvchgat(2, 1, 1, A_UNDERLINE, 0, NULL);
         
-        mvprintw(4, 1, "Product: %s", (query1[0]=='\0' || product==NULL)?"":product->name);
-        mvprintw(5, 1, "Price: %.2f", (query1[0]=='\0' || product==NULL)?0.0:product->price);
+        mvprintw( 4, 1, "ID: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.price);
+        mvprintw( 5, 1, "Product: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.product);
+        mvprintw( 6, 1, "Stock: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.stock);
+        mvprintw( 7, 1, "Price: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.price);
+        mvprintw( 8, 1, "Price1: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.price01);
+        mvprintw( 9, 1, "Price2: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.price02);
+        mvprintw(10, 1, "Price3: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.price03);
+        mvprintw(11, 1, "Fabricante: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.fabricante);
+        mvprintw(12, 1, "Proveedor: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.proveedor);
+        mvprintw(13, 1, "Departamento: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.departamento);
+        mvprintw(14, 1, "Clase: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.clase);
+        mvprintw(15, 1, "Subclase: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.subclase);
+        mvprintw(16, 1, "IVA: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.tipo_IVA);
 
         attron(COLOR_PAIR(2));
         mvprintw(2, 7, "%13s", query1);
@@ -738,7 +868,7 @@ int main() {
         attroff(COLOR_PAIR(1));
 
         for (int i = scroll_offset; i < cart_count && i - scroll_offset < max_y - 3; i++) {
-            mvprintw((i - scroll_offset) + 2, x_offset, "%c %03d. %-15s - %.2f", (i+1)==cart_count?'>':' ' , i + 1, shopping_cart[i]->name, shopping_cart[i]->price);
+            mvprintw((i - scroll_offset) + 2, x_offset, "%c %03d %-21.21s - %6.2f", (i+1)==cart_count?'>':' ' , i + 1, shopping_cart[i]->product, shopping_cart[i]->price);
         }
 
         // Footer
@@ -791,7 +921,7 @@ int main() {
         }
 
         if (ch != ERR && ch != KEY_RESIZE) { // Only process valid inputs
-            if (ch == ch == 'M' || ch == 'm') {
+            if (ch == 'M' || ch == 'm') {
                 ch = manage_menu();
                 clear(); // Clear the main window after returning from the menu
             }
@@ -799,36 +929,66 @@ int main() {
             int l = strlen(query1);
             char text[50] = "";
             strcpy(text, query1);
-            if (l<13) {
+            if (l < 13 && isprint(ch)) {
                 text[l] = (char)ch;
                 text[l + 1] = '\0';
             };
-            product = search_product(text);
+            bool found = search_product_disk(text, &product);
 
-            if (ch == 10) { // ENTER key
-                product = search_product(query1);
-                query1[0] = '\0'; // Clear the input field
-
-                if (product) {
-                    shopping_cart[cart_count++] = product;
-                    total += product->price;
-                    if (beep_on_insert) {
-                        beep();
+            if (ch == 10 || ch == KEY_ENTER) { // ENTER key
+                if (found) {
+                    // Añadir al carrito
+                    Product *prod_ptr = malloc(sizeof(Product));
+                    if (prod_ptr == NULL) {
+                        mvprintw(max_y - 2, 0, "Memory allocation error.");
+                        nodelay(stdscr, FALSE); // Temporarily block
+                        getch();
+                        nodelay(stdscr, TRUE); // Restore non-blocking
+                    } else {
+                        *prod_ptr = product;
+                        shopping_cart[cart_count++] = prod_ptr;
+                        total += product.price;
+                        if (beep_on_insert) {
+                            beep();
+                        }
                     }
-
                 } else {
                     mvprintw(max_y - 2, 0, "Product not found. Press key ...");
                     nodelay(stdscr, FALSE); // Temporarily block
                     getch();
                     nodelay(stdscr, TRUE); // Restore non-blocking
                 }
+                query1[0] = '\0'; // Clear the input field
             } else if (ch == 'N' || ch == 'n') { // Switch to name search
                 mvprintw(max_y - 3, 0, "Enter product name: ");
                 echo();
-                char product_name[20];                
+                char product_name[50];                
                 nodelay(stdscr, FALSE); // Temporarily block
                 getstr(product_name);
-                nodelay(stdscr, TRUE); // Restore non-blocking
+                noecho();
+                // Realizar búsqueda por nombre
+                if (search_product_disk(product_name, &product)) {
+                    // Añadir al carrito
+                    Product *prod_ptr = malloc(sizeof(Product));
+                    if (prod_ptr == NULL) {
+                        mvprintw(max_y - 2, 0, "Memory allocation error.");
+                        nodelay(stdscr, FALSE); // Temporarily block
+                        getch();
+                        nodelay(stdscr, TRUE); // Restore non-blocking
+                    } else {
+                        *prod_ptr = product;
+                        shopping_cart[cart_count++] = prod_ptr;
+                        total += product.price;
+                        if (beep_on_insert) {
+                            beep();
+                        }
+                    }
+                } else {
+                    mvprintw(max_y - 2, 0, "Product not found. Press key ...");
+                    nodelay(stdscr, FALSE); // Temporarily block
+                    getch();
+                    nodelay(stdscr, TRUE); // Restore non-blocking
+                }
             } else if (ch == 'A' || ch == 'a') { // Change agent code
                 mvprintw(max_y - 3, 0, "Enter agent code (ENTER='no agent'): ");
                 echo();
@@ -854,7 +1014,12 @@ int main() {
                 }
             } else if (ch == 'P' || ch == 'p') { // Checkout
                 if (show_window("Checkout? (Y/n)")) {
+                    // Guardar la transacción
                     save_transaction("transactions.csv", shopping_cart, cart_count, total);
+                    // Limpiar el carrito
+                    for (int i = 0; i < cart_count; i++) {
+                        free(shopping_cart[i]);
+                    }
                     cart_count = 0;
                     total = 0.0;
                 };
@@ -864,20 +1029,21 @@ int main() {
                 mvprintw(max_y - 3, max_x / 2 + 2, "POS to delete (last by default): ");
                 echo();
                 char pos_input[10];
-                //nodelay(stdscr, FALSE); // Temporarily block
                 getstr(pos_input);
-                //nodelay(stdscr, TRUE); // Restore non-blocking
                 noecho();
                 int pos;
-                if (strlen(pos_input)==0) { pos = cart_count - 1; }
+                if (strlen(pos_input) == 0) { 
+                    pos = cart_count - 1; 
+                }
                 else pos = atoi(pos_input) - 1;
                 if (pos >= 0 && pos < cart_count) {
-                    mvprintw(max_y - 2, max_x / 2 + 2, "Delete %s (%s)? (Y/n): ", shopping_cart[pos]->name, shopping_cart[pos]->code);
+                    mvprintw(max_y - 2, max_x / 2 + 2, "Delete %s (%d)? (Y/n): ", shopping_cart[pos]->product, pos + 1);
                     nodelay(stdscr, FALSE); // Temporarily block
                     int confirm = getch();
                     nodelay(stdscr, TRUE); // Restore non-blocking
                     if (confirm != 'n' && confirm != 'N') {
                         total -= shopping_cart[pos]->price;
+                        free(shopping_cart[pos]);
                         for (int i = pos; i < cart_count - 1; i++) {
                             shopping_cart[i] = shopping_cart[i + 1];
                         }
@@ -915,19 +1081,11 @@ int main() {
                 }
             } else if (ch == 'q' || ch == 'Q') { // Quit
                 break;
-            } else if (ch != '\n') {
-                if (input_mode == 1) {
-                    int len = strlen(query1);
-                    if (len<13) {
-                        query1[len] = (char)ch;
-                        query1[len + 1] = '\0';
-                    }
-                } else {
-                    int len = strlen(query2);
-                    if (len<13) {
-                        query2[len] = (char)ch;
-                        query2[len + 1] = '\0';
-                    }
+            } else if (isprint(ch)) { // Añadir caracteres al query1
+                int len = strlen(query1);
+                if (len < 13) {
+                    query1[len] = (char)ch;
+                    query1[len + 1] = '\0';
                 }
             }
         } 

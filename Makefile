@@ -1,27 +1,36 @@
-# Makefile for POS application using ncurses and menu library
+# Makefile for POS application and product converter utility
 
 # Compiler and flags
-CC = gcc
-CFLAGS = -Os -s
+CC      = gcc
+CFLAGS  = -Os -s
 LDFLAGS = -lncurses
 
-# Target and source files
-TARGET = pos
-SRC = main.c
+# Ejecutables que generaremos
+ALL_TARGETS = pos product_converter
 
-# Default target
-all: $(TARGET)
+# Fuentes del POS
+SRC_POS = main.c
 
-# Build the target
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRC) $(LDFLAGS)
+# Fuentes del conversor
+SRC_CONVERTER = product_converter.c
 
-# Build in debug mode
+# Regla principal: construir todo
+all: $(ALL_TARGETS)
+
+# Compilar el POS
+pos: $(SRC_POS)
+	$(CC) $(CFLAGS) -o $@ $(SRC_POS) $(LDFLAGS)
+
+# Compilar el conversor
+product_converter: $(SRC_CONVERTER)
+	$(CC) $(CFLAGS) -o $@ $(SRC_CONVERTER)
+
+# Build en modo debug
 debug: CFLAGS += -DDEBUG
-debug: clean $(TARGET)
+debug: clean $(ALL_TARGETS)
 
-# Clean up
+# Limpieza
 clean:
-	rm -f $(TARGET)
+	rm -f $(ALL_TARGETS)
 
 .PHONY: all clean debug
