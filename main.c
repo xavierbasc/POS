@@ -371,6 +371,51 @@ void save_users_to_csv(const char *filename) {
     fclose(file);
 }
 
+bool show_window(const char *msg) {
+    curs_set(0);
+
+    // Crear una pequeña ventana de 5 filas x 40 columnas, centrada
+    int height = 5, width = 40;
+    int starty = (LINES - height) / 2;
+    int startx = (COLS - width) / 2;
+
+    WINDOW *prompt_win = newwin(height, width, starty, startx);
+    wbkgd(prompt_win, COLOR_PAIR(4));
+
+    box(prompt_win, 0, 0);  // Dibujar borde
+    keypad(prompt_win, TRUE);
+
+    int center_col = (width - (int)strlen(msg)) / 2;
+    mvwprintw(prompt_win, 2, center_col, "%s", msg);
+
+    // Mostramos ventana
+    wrefresh(prompt_win);
+
+    // Esperar tecla
+    nodelay(stdscr, FALSE); // Temporarily block
+    int ch = wgetch(prompt_win);
+    nodelay(stdscr, TRUE); // Restore non-blocking
+
+    // Analizar la tecla
+    //   - Si es 'n' o 'N', consideramos que la respuesta es NO.
+    //   - Si es ENTER o 's'/'S' o cualquier otra, por defecto es SÍ.
+    bool respuesta_si = true;
+    if (ch == 'n' || ch == 'N') {
+        respuesta_si = false;
+    }
+    // ENTER es '\n' (ASCII 10) o KEY_ENTER, dependiendo del terminal.
+    // En muchas configuraciones getch() devuelve '\n' al pulsar ENTER.
+
+    // Borrar la ventana
+    werase(prompt_win);
+    wrefresh(prompt_win);
+    delwin(prompt_win);
+    curs_set(1);
+    return(respuesta_si);
+}
+
+
+
 // Función para gestionar productos
 void manage_products() {
     clear();
@@ -578,6 +623,16 @@ int manage_menu() {
     }
 }
 
+/* What we do when we're all set to exit */
+void finish(void) {
+    curs_set(1);
+    clear();
+    refresh();
+    resetty();
+    endwin();
+    exit(0);
+}
+
 
 int main() {
     Product *product = NULL;
@@ -596,9 +651,9 @@ int main() {
     start_color();
 
     // Define colors
-    init_color(COLOR_CYAN, 100, 100, 100); // Gris claro (escala de 0 a 1000)
-    init_color(COLOR_BLUE, 0, 0, 500); // Gris claro (escala de 0 a 1000)
-    init_color(COLOR_YELLOW, 1000, 1000, 0); // Gris claro (escala de 0 a 1000)
+    init_color(COLOR_CYAN, 50, 50, 50); // (0 - 1000)
+    init_color(COLOR_BLUE, 0, 0, 500);
+    init_color(COLOR_YELLOW, 1000, 1000, 0);
 
     init_pair(1, COLOR_GREEN, COLOR_BLACK);
     init_pair(2, COLOR_WHITE, COLOR_CYAN);
@@ -624,8 +679,26 @@ int main() {
 
         // Draw vertical separator
         for (int y = 2; y < max_y-2; y++) {
+            mvaddch(y, 0, ACS_VLINE);
             mvaddch(y, max_x / 2, ACS_VLINE);
+            mvaddch(y, max_x - 1, ACS_VLINE);
         }
+
+        // Líneas horizontales (superior e inferior)
+        for (int col = 1; col < max_x; col++) {
+            mvaddch(1, col, ACS_HLINE);
+            mvaddch(max_y - 2, col, ACS_HLINE);
+        }
+
+        // Esquinas
+        mvaddch(1, 0, ACS_ULCORNER);                         // esquina sup izq
+        mvaddch(1, max_x - 1, ACS_URCORNER);             // esquina sup der
+        mvaddch(max_y - 2, 0, ACS_LLCORNER);            // esquina inf izq
+        mvaddch(max_y - 2, max_x - 1, ACS_LRCORNER);// esquina inf der
+
+        mvaddch(1, max_x/2, ACS_TTEE);
+        mvaddch(max_y - 2, max_x/2, ACS_BTEE);
+
 
         // Display current time in the top-right corner
         time_t now = time(NULL);
@@ -647,6 +720,7 @@ int main() {
             mvprintw(0, 1, "Agent: %s (%02d:%02d:%02d)", agent_code, hours, minutes, seconds);
 
         mvprintw(2, 1, "CODE: ");
+        mvprintw(2, 21, "EAN13");
         //mvprintw(4, 10, "%2s", query2);
         //mvchgat(2, 1, 1, A_UNDERLINE, 0, NULL);
         
@@ -654,7 +728,7 @@ int main() {
         mvprintw(5, 1, "Price: %.2f", (query1[0]=='\0' || product==NULL)?0.0:product->price);
 
         attron(COLOR_PAIR(2));
-        mvprintw(2, 7, "%19s", query1);
+        mvprintw(2, 7, "%13s", query1);
         attroff(COLOR_PAIR(2));
 
         // Right panel for shopping cart
@@ -680,10 +754,7 @@ int main() {
         attron(COLOR_PAIR(3));
 
         // Draw horizontal
-        for (int x = 0; x < max_x / 2; x++) {
-            mvaddch(max_y - 1, x, ' ');
-        }
-        for (int x = max_x / 2 + 1; x < max_x ; x++) {
+        for (int x = 0; x < max_x; x++) {
             mvaddch(max_y - 1, x, ' ');
         }
 
@@ -702,7 +773,9 @@ int main() {
         }
 
         attroff(COLOR_PAIR(3));
-        move(2, 25); // Place the cursor at the end of the input field
+
+        curs_set(1);
+        move(2, 19); // Place the cursor at the end of the input field
 
         // Refresh screen every second
         timeout(1000);
@@ -726,8 +799,10 @@ int main() {
             int l = strlen(query1);
             char text[50] = "";
             strcpy(text, query1);
-            text[l] = (char)ch;
-            text[l + 1] = '\0';
+            if (l<13) {
+                text[l] = (char)ch;
+                text[l + 1] = '\0';
+            };
             product = search_product(text);
 
             if (ch == 10) { // ENTER key
@@ -778,22 +853,20 @@ int main() {
                     nodelay(stdscr, TRUE); // Restore non-blocking
                 }
             } else if (ch == 'P' || ch == 'p') { // Checkout
-                mvprintw(max_y - 2, x_offset , "> Checkout? (Y/n)");
-                nodelay(stdscr, FALSE); // Temporarily block
-                int ch = getch();
-                nodelay(stdscr, TRUE); // Restore non-blocking
-                if (ch != 'N' && ch != 'n') {
+                if (show_window("Checkout? (Y/n)")) {
                     save_transaction("transactions.csv", shopping_cart, cart_count, total);
                     cart_count = 0;
                     total = 0.0;
-                }
+                };
+            } else if (ch == 'S' || ch == 's') { // Screenshot
+                system("scrot -u");
             } else if (ch == 'D' || ch == 'd') { // Delete item
                 mvprintw(max_y - 3, max_x / 2 + 2, "POS to delete (last by default): ");
                 echo();
                 char pos_input[10];
-                nodelay(stdscr, FALSE); // Temporarily block
+                //nodelay(stdscr, FALSE); // Temporarily block
                 getstr(pos_input);
-                nodelay(stdscr, TRUE); // Restore non-blocking
+                //nodelay(stdscr, TRUE); // Restore non-blocking
                 noecho();
                 int pos;
                 if (strlen(pos_input)==0) { pos = cart_count - 1; }
@@ -845,12 +918,16 @@ int main() {
             } else if (ch != '\n') {
                 if (input_mode == 1) {
                     int len = strlen(query1);
-                    query1[len] = (char)ch;
-                    query1[len + 1] = '\0';
+                    if (len<13) {
+                        query1[len] = (char)ch;
+                        query1[len + 1] = '\0';
+                    }
                 } else {
                     int len = strlen(query2);
-                    query2[len] = (char)ch;
-                    query2[len + 1] = '\0';
+                    if (len<13) {
+                        query2[len] = (char)ch;
+                        query2[len + 1] = '\0';
+                    }
                 }
             }
         } 
@@ -859,6 +936,6 @@ int main() {
     }
 
     // End ncurses mode
-    endwin();
+    finish();
     return 0;
 }

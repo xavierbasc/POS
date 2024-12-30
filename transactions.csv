@@ -82,3 +82,57 @@ Ticket 20, Agent: Default, Date: 2024-12-27 23:25:13, Total: 6.80
   004, Milk, 1.20
   005, Bread, 1.50
   006, Cheese, 2.50
+Ticket 21, Agent: Default, Date: 2024-12-30 14:47:10, Total: 3.60
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+  001, Apple, 0.50
+  002, Banana, 0.30
+Ticket 22, Agent: Default, Date: 2024-12-30 15:01:26, Total: 15.40
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+  005, Bread, 1.50
+  006, Cheese, 2.50
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+  005, Bread, 1.50
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+  001, Apple, 0.50
+  001, Apple, 0.50
+  001, Apple, 0.50
+Ticket 23, Agent: Default, Date: 2024-12-30 15:17:18, Total: 4.30
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+  005, Bread, 1.50
+Ticket 24, Agent: Default, Date: 2024-12-30 15:17:22, Total: 1.60
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+Ticket 25, Agent: Default, Date: 2024-12-30 15:44:52, Total: 10.10
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+  005, Bread, 1.50
+  006, Cheese, 2.50
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
+  004, Milk, 1.20
+  001, Apple, 0.50
+Ticket 26, Agent: Default, Date: 2024-12-30 15:56:16, Total: 0.50
+  001, Apple, 0.50
+Ticket 27, Agent: Default, Date: 2024-12-30 15:56:26, Total: 1.60
+  001, Apple, 0.50
+  002, Banana, 0.30
+  003, Orange, 0.80
