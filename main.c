@@ -6,12 +6,13 @@
 #include <time.h>
 #include <unistd.h> // Para usleep()
 #include <stdbool.h> // Para valores booleanos
+#include <stdarg.h>
 
 // Define the structure for products
 typedef struct {
     int    ID;
     char   EAN13[14];         // Código EAN13: 13 caracteres + terminador nulo
-    char   product[50];
+    char   product[100];
     float  price;
     int    stock;
     float  price01;
@@ -24,6 +25,10 @@ typedef struct {
     char   clase[50];         // Clase
     char   subclase[50];      // Subclase
     char   tipo_IVA[20];      // Tipo de IVA: "reducido" o "super reducido"
+    char   descripcion1[100]; // Nuevos campos de descripción
+    char   descripcion2[100];
+    char   descripcion3[100];
+    char   descripcion4[100];
 } Product;
 
 
@@ -76,22 +81,25 @@ void load_config(const char *filename) {
 
 // Función para buscar un producto en el archivo binario
 bool search_product_disk(const char *query, Product *result) {
-    FILE *file = fopen("products.dat", "rb");
-    if (!file) {
-        perror("Error opening binary product file");
-        return false;
-    }
-
-    Product temp;
-    while (fread(&temp, sizeof(Product), 1, file) == 1) {
-        if (strstr(temp.product, query) || strstr(temp.product, query)) { // Puedes ajustar para code o name
-            *result = temp;
-            fclose(file);
-            return true;
+    if (strlen(query)>0) {
+        FILE *file = fopen("products.dat", "rb");
+        if (!file) {
+            perror("Error opening binary product file");
+            return false;
         }
-    }
 
-    fclose(file);
+        Product temp;
+        while (fread(&temp, sizeof(Product), 1, file) == 1) {
+            //if (strcmp(temp.ID, query) == 0) {
+            if (temp.ID == atoi(query)) {
+                *result = temp;
+                fclose(file);
+                return true;
+            }
+        }
+
+        fclose(file);
+    }
     return false;
 }
 
@@ -755,6 +763,20 @@ void finish(void) {
     exit(0);
 }
 
+void print_text(int y, int x, const char *name, const char *value, ...) {
+    va_list args;
+    int len = strlen(name);
+    va_start(args, value);
+    attron(COLOR_PAIR(5));
+    mvprintw(y, x, "%s", name);
+    mvaddch(y, x + len, ':');
+    attroff(COLOR_PAIR(5));
+    move(y, x + len + 2);
+    vwprintw(stdscr, value, args);
+    va_end(args);
+}
+
+
 // Función principal
 int main() {
     Product product;
@@ -775,14 +797,16 @@ int main() {
     init_color(COLOR_CYAN, 50, 50, 50); // (0 - 1000)
     init_color(COLOR_BLUE, 0, 0, 500);
     init_color(COLOR_YELLOW, 1000, 1000, 0);
+    init_color(COLOR_RED, 811, 284, 0);
 
     init_pair(1, COLOR_GREEN, COLOR_BLACK);
     init_pair(2, COLOR_WHITE, COLOR_CYAN);
     init_pair(3, COLOR_WHITE, COLOR_BLUE);
     init_pair(4, COLOR_YELLOW, COLOR_BLUE);
+    init_pair(5, COLOR_RED, COLOR_BLACK);
 
-    char query1[50] = "";
-    char query2[50] = "";
+    char query1[50] = "\0";
+    char query2[50] = "\0";
     Product *shopping_cart[50];
     int cart_count = 0;
     float total = 0.0;
@@ -842,20 +866,27 @@ int main() {
 
         mvprintw(2, 1, "CODE: ");
         mvprintw(2, 21, "EAN13");
+
+        bool search = search_product_disk(query1, &product);
         
-        mvprintw( 4, 1, "ID: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.price);
-        mvprintw( 5, 1, "Product: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.product);
-        mvprintw( 6, 1, "Stock: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.stock);
-        mvprintw( 7, 1, "Price: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.price);
-        mvprintw( 8, 1, "Price1: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.price01);
-        mvprintw( 9, 1, "Price2: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.price02);
-        mvprintw(10, 1, "Price3: %.2f", (query1[0]=='\0' || !search_product_disk(query1, &product))?0.0:product.price03);
-        mvprintw(11, 1, "Fabricante: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.fabricante);
-        mvprintw(12, 1, "Proveedor: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.proveedor);
-        mvprintw(13, 1, "Departamento: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.departamento);
-        mvprintw(14, 1, "Clase: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.clase);
-        mvprintw(15, 1, "Subclase: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.subclase);
-        mvprintw(16, 1, "IVA: %s", (query1[0]=='\0' || !search_product_disk(query1, &product))?"":product.tipo_IVA);
+        print_text( 4, 1, "ID","%d", !search?0:product.price);
+        print_text( 5, 1, "Product","%s", !search?"-":product.product);
+        print_text( 6, 1, "Stock","%d", !search?0:product.stock);
+        print_text( 7, 1, "Fabricante","%s", !search?"":product.fabricante);
+        print_text( 8, 1, "Proveedor","%s", !search?"":product.proveedor);
+        print_text( 9, 1, "Departamento","%s", !search?"":product.departamento);
+        print_text(10, 1, "Clase","%s", !search?"":product.clase);
+        print_text(11, 1, "Subclase","%s", !search?"":product.subclase);
+        print_text(12, 1, "Description 1","%s", !search?"":product.descripcion1);
+        print_text(14, 1, "Description 2","%s", !search?"":product.descripcion2);
+        print_text(16, 1, "Description 3","%s", !search?"":product.descripcion3);
+        print_text(18, 1, "Description 4","%s", !search?"":product.descripcion4);
+
+        print_text(20, 1, "Price1","%.2f", !search?0.0:product.price);
+        print_text(21, 1, "Price2","%.2f", !search?0.0:product.price01);
+        print_text(22, 1, "Price3","%.2f", !search?0.0:product.price02);
+        print_text(23, 1, "Price4","%.2f", !search?0.0:product.price03);
+        print_text(25, 1, "IVA","%s", !search?"":product.tipo_IVA);
 
         attron(COLOR_PAIR(2));
         mvprintw(2, 7, "%13s", query1);

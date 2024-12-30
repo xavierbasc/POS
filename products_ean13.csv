@@ -1,21 +1,21 @@
-ID,EAN13,product,price,stock,price01,price02,price03,price04,fabricante,proveedor,departamento,clase,subclase,tipo_IVA
-1001,4006381333931,Wireless Mouse,25.99,150,24.50,23.00,22.00,21.00,Logitech,TechSupplier,Electrónica,Periféricos,Mouse,reducido
-1002,4006381333948,Mechanical Keyboard,89.99,80,85.00,82.00,80.00,78.00,Corsair,KeyBoardsCo,Electrónica,Periféricos,Teclado,reducido
-1003,4006381333955,HD Monitor,199.99,60,190.00,185.00,180.00,175.00,Samsung,DisplayWorld,Electrónica,Monitores,Monitor,reducido
-1004,4006381333962,USB-C Hub,45.50,200,43.00,41.00,39.00,37.00,Anker,HubSuppliers,Electrónica,Accesorios,Hub,reducido
-1005,4006381333979,External SSD 1TB,149.99,75,140.00,135.00,130.00,125.00,SanDisk,StorageSolutions,Almacenamiento,SSD,SSD,reducido
-1006,4006381333986,Webcam 1080p,59.99,120,55.00,53.00,50.00,48.00,Logitech,WebcamPro,Electrónica,Periféricos,Webcam,reducido
-1007,4006381333993,Noise-Cancelling Headphones,129.99,90,120.00,115.00,110.00,105.00,Bose,AudioWorld,Electrónica,Audio,Headphones,reducido
-1008,4006381334006,Laptop Stand,34.99,180,33.00,31.50,30.00,28.50,AmazonBasics,OfficeSuppliers,Oficina,Accesorios,Stand,reducido
-1009,4006381334013,Smartphone Charger,19.99,250,18.00,17.00,16.00,15.00,Anker,TechSupplier,Electrónica,Accesorios,Charger,reducido
-1010,4006381334020,Bluetooth Speaker,79.99,100,75.00,72.00,70.00,68.00,JBL,AudioWorld,Electrónica,Audio,Speaker,reducido
-1011,4006381334037,Graphics Tablet,249.99,50,240.00,230.00,220.00,210.00,Wacom,CreativeSupplies,Arte,Tablets,Tablet,reducido
-1012,4006381334044,Portable Projector,299.99,40,290.00,280.00,270.00,260.00,LG,ProjectorHub,Electrónica,Proyectores,Projector,reducido
-1013,4006381334051,LED Desk Lamp,39.99,160,38.00,36.00,34.00,32.00,Philips,HomeSuppliers,Iluminación,Iluminación,Desk Lamp,reducido
-1014,4006381334068,Smartwatch,199.99,70,190.00,185.00,180.00,175.00,Apple,WatchStore,Electrónica,Wearables,Smartwatch,reducido
-1015,4006381334075,Wireless Earbuds,59.99,140,55.00,53.00,50.00,48.00,Sony,AudioWorld,Electrónica,Audio,Earbuds,reducido
-1016,4006381334082,Gaming Chair,299.99,30,290.00,280.00,270.00,260.00,DXRacer,GamingSupplies,Muebles,Gaming,Gaming Chair,reducido
-1017,4006381334099,Action Camera,149.99,65,140.00,135.00,130.00,125.00,GoPro,CameraPro,Electrónica,Cámaras,Action Camera,reducido
-1018,4006381334105,Portable Charger 20000mAh,39.99,220,38.00,36.00,34.00,32.00,Anker,TechSupplier,Electrónica,Accesorios,Charger,reducido
-1019,4006381334112,Smart LED Bulb,14.99,300,13.50,13.00,12.50,12.00,Philips,HogarSuppliers,Iluminación,Iluminación,Bulb,reducido
-1020,4006381334129,Wireless Router,89.99,85,85.00,82.00,80.00,78.00,TP-Link,NetworkSuppliers,Electrónica,Red,Router,reducido
+ID,EAN13,product,price,stock,price01,price02,price03,price04,fabricante,proveedor,departamento,clase,subclase,tipo_IVA,descripcion1,descripcion2,descripcion3,descripcion4
+1001,4006381333931,Wireless Mouse,25.99,150,24.50,23.00,22.00,21.00,Logitech,TechSupplier,Electrónica,Periféricos,Mouse,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1002,4006381333948,Mechanical Keyboard,89.99,80,85.00,82.00,80.00,78.00,Corsair,KeyBoardsCo,Electrónica,Periféricos,Teclado,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1003,4006381333955,HD Monitor,199.99,60,190.00,185.00,180.00,175.00,Samsung,DisplayWorld,Electrónica,Monitores,Monitor,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1004,4006381333962,USB-C Hub,45.50,200,43.00,41.00,39.00,37.00,Anker,HubSuppliers,Electrónica,Accesorios,Hub,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1005,4006381333979,External SSD 1TB,149.99,75,140.00,135.00,130.00,125.00,SanDisk,StorageSolutions,Almacenamiento,SSD,SSD,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1006,4006381333986,Webcam 1080p,59.99,120,55.00,53.00,50.00,48.00,Logitech,WebcamPro,Electrónica,Periféricos,Webcam,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1007,4006381333993,Noise-Cancelling Headphones,129.99,90,120.00,115.00,110.00,105.00,Bose,AudioWorld,Electrónica,Audio,Headphones,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1008,4006381334006,Laptop Stand,34.99,180,33.00,31.50,30.00,28.50,AmazonBasics,OfficeSuppliers,Oficina,Accesorios,Stand,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1009,4006381334013,Smartphone Charger,19.99,250,18.00,17.00,16.00,15.00,Anker,TechSupplier,Electrónica,Accesorios,Charger,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1010,4006381334020,Bluetooth Speaker,79.99,100,75.00,72.00,70.00,68.00,JBL,AudioWorld,Electrónica,Audio,Speaker,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1011,4006381334037,Graphics Tablet,249.99,50,240.00,230.00,220.00,210.00,Wacom,CreativeSupplies,Arte,Tablets,Tablet,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1012,4006381334044,Portable Projector,299.99,40,290.00,280.00,270.00,260.00,LG,ProjectorHub,Electrónica,Proyectores,Projector,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1013,4006381334051,LED Desk Lamp,39.99,160,38.00,36.00,34.00,32.00,Philips,HomeSuppliers,Iluminación,Iluminación,Desk Lamp,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1014,4006381334068,Smartwatch,199.99,70,190.00,185.00,180.00,175.00,Apple,WatchStore,Electrónica,Wearables,Smartwatch,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1015,4006381334075,Wireless Earbuds,59.99,140,55.00,53.00,50.00,48.00,Sony,AudioWorld,Electrónica,Audio,Earbuds,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1016,4006381334082,Gaming Chair,299.99,30,290.00,280.00,270.00,260.00,DXRacer,GamingSupplies,Muebles,Gaming,Gaming Chair,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1017,4006381334099,Action Camera,149.99,65,140.00,135.00,130.00,125.00,GoPro,CameraPro,Electrónica,Cámaras,Action Camera,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1018,4006381334105,Portable Charger 20000mAh,39.99,220,38.00,36.00,34.00,32.00,Anker,TechSupplier,Electrónica,Accesorios,Charger,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1019,4006381334112,Smart LED Bulb,14.99,300,13.50,13.00,12.50,12.00,Philips,HogarSuppliers,Iluminación,Iluminación,Bulb,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 
+1020,4006381334129,Wireless Router,89.99,85,85.00,82.00,80.00,78.00,TP-Link,NetworkSuppliers,Electrónica,Red,Router,reducido,"Esta es una prueba, con comas","Segunda descripción, con acento", "tercera descripción", "cuarta descripción" 

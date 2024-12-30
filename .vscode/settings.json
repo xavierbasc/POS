@@ -1,6 +1,11 @@
 {
     "files.associations": {
         "stdlib.h": "c",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "*.tcc": "c",
+        "format": "c",
+        "chrono": "c",
+        "typeindex": "c",
+        "typeinfo": "c"
     }
 }
