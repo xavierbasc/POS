@@ -37,11 +37,19 @@ bool beep_on_insert = false;
 char currency_symbol[10] = "$";
 bool hide_currency_symbol = false;
 bool currency_after_amount = false;
-
 bool authenticated = false;
+int ticket_id;
 
 char agent_code[20] = "Default"; // Agent code
 time_t agent_login_time; // Time when the agent logged in
+
+Product product;
+char query1[50] = "\0";
+Product *shopping_cart[50];
+int cart_count = 0;
+float total = 0.0;
+int scroll_offset = 0; // Offset for scrolling
+int max_y, max_x;
 
 // Función para cargar configuración desde config.ini
 void load_config(const char *filename) {
@@ -215,7 +223,7 @@ void update_last_id(const char *filename, int last_id) {
 // Función para guardar una transacción en un archivo CSV
 void save_transaction(const char *filename, Product **cart, int count, float total) {
     static const char *id_filename = "last_id.txt";
-    int ticket_id = read_last_id(id_filename);
+    ticket_id = read_last_id(id_filename);
 
     FILE *file = fopen(filename, "a");
     if (!file) {
@@ -236,7 +244,8 @@ void save_transaction(const char *filename, Product **cart, int count, float tot
     fclose(file);
 
     // Update the last ID
-    update_last_id(id_filename, ticket_id + 1);
+    ticket_id = ticket_id + 1;
+    update_last_id(id_filename, ticket_id);
 }
 
 // Función para obtener una contraseña de manera segura
@@ -776,50 +785,28 @@ void print_text(int y, int x, const char *name, const char *value, ...) {
     va_end(args);
 }
 
+void draw_time() {
+    // Display current time in the top-right corner
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    char time_str[10];
+    strftime(time_str, sizeof(time_str), "%H:%M:%S", t);
+    mvprintw(0, max_x - strlen(time_str) - 1, "%s", time_str);
 
-// Función principal
-int main() {
-    Product product;
+    // Calculate logged-in duration
+    int duration = (int)difftime(now, agent_login_time);
+    int hours = duration / 3600;
+    int minutes = (duration % 3600) / 60;
+    int seconds = duration % 60;
 
-    load_config("config.ini");
+    if (!authenticated)
+        mvprintw(0, 1, "Agent: - no agent -");
+    else
+        mvprintw(0, 1, "Agent: %s (%02d:%02d:%02d)", agent_code, hours, minutes, seconds);
+}
 
-    // No cargamos productos en memoria, trabajamos directamente con el archivo binario
-
-    // Initialize ncurses
-    initscr();
-    cbreak();
-    noecho(); // Disable echo for smoother UI
-    keypad(stdscr, TRUE);
-    nodelay(stdscr, TRUE); // Non-blocking input
-    start_color();
-
-    // Define colors
-    init_color(COLOR_CYAN, 50, 50, 50); // (0 - 1000)
-    init_color(COLOR_BLUE, 0, 0, 500);
-    init_color(COLOR_YELLOW, 1000, 1000, 0);
-    init_color(COLOR_RED, 811, 284, 0);
-
-    init_pair(1, COLOR_GREEN, COLOR_BLACK);
-    init_pair(2, COLOR_WHITE, COLOR_CYAN);
-    init_pair(3, COLOR_WHITE, COLOR_BLUE);
-    init_pair(4, COLOR_YELLOW, COLOR_BLUE);
-    init_pair(5, COLOR_RED, COLOR_BLACK);
-
-    char query1[50] = "\0";
-    char query2[50] = "\0";
-    Product *shopping_cart[50];
-    int cart_count = 0;
-    float total = 0.0;
-    int scroll_offset = 0; // Offset for scrolling
-
-    int input_mode = 1; // 1 for code, 2 for name
-    agent_login_time = time(NULL); // Record the login time
-    
-    int ch = 0;
-
-    while (1) {
+void draw_mainscreen() {
         erase(); // Clear screen without flickering
-        int max_y, max_x;
         getmaxyx(stdscr, max_y, max_x);
 
         // Draw vertical separator
@@ -844,62 +831,42 @@ int main() {
         mvaddch(1, max_x/2, ACS_TTEE);
         mvaddch(max_y - 2, max_x/2, ACS_BTEE);
 
-
-        // Display current time in the top-right corner
-        time_t now = time(NULL);
-        struct tm *t = localtime(&now);
-        char time_str[10];
-        strftime(time_str, sizeof(time_str), "%H:%M:%S", t);
-        mvprintw(0, max_x - strlen(time_str) - 1, "%s", time_str);
-
-        // Calculate logged-in duration
-        int duration = (int)difftime(now, agent_login_time);
-        int hours = duration / 3600;
-        int minutes = (duration % 3600) / 60;
-        int seconds = duration % 60;
-
-        // Left panel for input
-        if (!authenticated)
-            mvprintw(0, 1, "Agent: - no agent -");
-        else
-            mvprintw(0, 1, "Agent: %s (%02d:%02d:%02d)", agent_code, hours, minutes, seconds);
-
         mvprintw(2, 1, "CODE: ");
+        attron(COLOR_PAIR(2));
+        mvprintw(2, 7, "%13s", query1);
+        attroff(COLOR_PAIR(2));
         mvprintw(2, 21, "EAN13");
 
         bool search = search_product_disk(query1, &product);
         
         print_text( 4, 1, "ID","%d", !search?0:product.price);
-        print_text( 5, 1, "Product","%s", !search?"-":product.product);
+        print_text( 5, 1, "Producto","%s", !search?"-":product.product);
         print_text( 6, 1, "Stock","%d", !search?0:product.stock);
         print_text( 7, 1, "Fabricante","%s", !search?"":product.fabricante);
         print_text( 8, 1, "Proveedor","%s", !search?"":product.proveedor);
         print_text( 9, 1, "Departamento","%s", !search?"":product.departamento);
         print_text(10, 1, "Clase","%s", !search?"":product.clase);
         print_text(11, 1, "Subclase","%s", !search?"":product.subclase);
-        print_text(12, 1, "Description 1","%s", !search?"":product.descripcion1);
-        print_text(14, 1, "Description 2","%s", !search?"":product.descripcion2);
-        print_text(16, 1, "Description 3","%s", !search?"":product.descripcion3);
-        print_text(18, 1, "Description 4","%s", !search?"":product.descripcion4);
+        print_text(12, 1, "Descripción 1","%s", !search?"":product.descripcion1);
+        print_text(14, 1, "Descripción 2","%s", !search?"":product.descripcion2);
+        print_text(16, 1, "Descripción 3","%s", !search?"":product.descripcion3);
+        print_text(18, 1, "Descripción 4","%s", !search?"":product.descripcion4);
 
-        print_text(20, 1, "Price1","%.2f", !search?0.0:product.price);
-        print_text(21, 1, "Price2","%.2f", !search?0.0:product.price01);
-        print_text(22, 1, "Price3","%.2f", !search?0.0:product.price02);
-        print_text(23, 1, "Price4","%.2f", !search?0.0:product.price03);
+        print_text(20, 1, "Precio 1","%.2f", !search?0.0:product.price);
+        print_text(21, 1, "Precio 2","%.2f", !search?0.0:product.price01);
+        print_text(22, 1, "Precio 3","%.2f", !search?0.0:product.price02);
+        print_text(23, 1, "Precio 4","%.2f", !search?0.0:product.price03);
         print_text(25, 1, "IVA","%s", !search?"":product.tipo_IVA);
-
-        attron(COLOR_PAIR(2));
-        mvprintw(2, 7, "%13s", query1);
-        attroff(COLOR_PAIR(2));
 
         // Right panel for shopping cart
         int x_offset = max_x / 2 + 2;
         attron(COLOR_PAIR(1));
-        mvprintw(0, x_offset, "  Total ticket: %.2f", total);
+        mvprintw(0, x_offset + 2, "Total: %.2f", total);
+        mvprintw(0, max_x - 26, "[ticket %d]", ticket_id);
         attroff(COLOR_PAIR(1));
 
         for (int i = scroll_offset; i < cart_count && i - scroll_offset < max_y - 3; i++) {
-            mvprintw((i - scroll_offset) + 2, x_offset, "%c %03d %-21.21s - %6.2f", (i+1)==cart_count?'>':' ' , i + 1, shopping_cart[i]->product, shopping_cart[i]->price);
+            mvprintw((i - scroll_offset) + 2, x_offset, "%c %03d %-25.25s - %7.2f", (i+1)==cart_count?'>':' ' , i + 1, shopping_cart[i]->product, shopping_cart[i]->price);
         }
 
         // Footer
@@ -919,6 +886,7 @@ int main() {
             mvaddch(max_y - 1, x, ' ');
         }
 
+        // Menu inferior
         mvprintw(max_y - 1, 0, " Agent  Management");
         mvchgat(max_y - 1, 1, 1, A_COLOR, 4, NULL); // BACKGROUND COLOR
         mvchgat(max_y - 1, 8, 1, A_COLOR, 4, NULL); // BACKGROUND COLOR
@@ -936,61 +904,166 @@ int main() {
         attroff(COLOR_PAIR(3));
 
         curs_set(1);
-        move(2, 19); // Place the cursor at the end of the input field
+        move(2, 19); // Place the cursor at the end of the input field    
+}
 
-        // Refresh screen every second
-        timeout(1000);
 
+int main() {
+    load_config("config.ini");
+    static const char *id_filename = "last_id.txt";
+    ticket_id = read_last_id(id_filename);
+
+    // Initialize ncurses
+    initscr();
+    cbreak();
+    noecho(); // Disable echo for smoother UI
+    keypad(stdscr, TRUE);
+    nodelay(stdscr, TRUE); // Non-blocking input
+    start_color();
+
+    // Define colors
+    init_color(COLOR_CYAN, 50, 50, 50); // (0 - 1000)
+    init_color(COLOR_BLUE, 0, 0, 500);
+    init_color(COLOR_YELLOW, 1000, 1000, 0);
+    init_color(COLOR_RED, 811, 284, 0);
+
+    init_pair(1, COLOR_GREEN, COLOR_BLACK);
+    init_pair(2, COLOR_WHITE, COLOR_CYAN);
+    init_pair(3, COLOR_WHITE, COLOR_BLUE);
+    init_pair(4, COLOR_YELLOW, COLOR_BLUE);
+    init_pair(5, COLOR_RED, COLOR_BLACK);
+
+    agent_login_time = time(NULL); // Record the login time
+    
+    int ch = 0;
+    int draw = true;
+    int run = true;
+
+    while (run) {
         // Non-blocking input
         nodelay(stdscr, TRUE);
         ch = getch();
         
-        // Handle KEY_RESIZE explicitly
-        if (ch == KEY_RESIZE) {
-            getmaxyx(stdscr, max_y, max_x); // Recalculate window size
-            clear(); // Clear the screen completely to redraw
-        }
+        if (ch != ERR) 
+        switch (ch) {
+            case KEY_RESIZE:
+                getmaxyx(stdscr, max_y, max_x);
+                draw=true;
+                break;
 
-        if (ch != ERR && ch != KEY_RESIZE) { // Only process valid inputs
-            if (ch == 'M' || ch == 'm') {
+            case 'M':
+            case 'm':
                 ch = manage_menu();
-                clear(); // Clear the main window after returning from the menu
-            }
+                draw=true;
+                break;
 
-            int l = strlen(query1);
-            char text[50] = "";
-            strcpy(text, query1);
-            if (l < 13 && isprint(ch)) {
-                text[l] = (char)ch;
-                text[l + 1] = '\0';
-            };
-            bool found = search_product_disk(text, &product);
+            case 'S':
+            case 's':
+                system("scrot -u");
+                break;
 
-            if (ch == 10 || ch == KEY_ENTER) { // ENTER key
-                if (found) {
-                    // Añadir al carrito
-                    Product *prod_ptr = malloc(sizeof(Product));
-                    if (prod_ptr == NULL) {
-                        mvprintw(max_y - 2, 0, "Memory allocation error.");
-                        nodelay(stdscr, FALSE); // Temporarily block
-                        getch();
-                        nodelay(stdscr, TRUE); // Restore non-blocking
-                    } else {
-                        *prod_ptr = product;
-                        shopping_cart[cart_count++] = prod_ptr;
-                        total += product.price;
-                        if (beep_on_insert) {
-                            beep();
+            case KEY_BACKSPACE:
+            case 127:
+                query1[strlen(query1) - 1] = '\0';
+                draw = true;
+                break;
+
+            case KEY_UP:
+                if (scroll_offset > 0) {
+                    scroll_offset--;
+                    draw = true;
+                }
+                break;
+
+            case KEY_DOWN:
+                if (scroll_offset < cart_count - (max_y - 3)) {
+                    scroll_offset++;
+                    draw = true;
+                }
+                break;
+
+            case 'Q':
+            case 'q':
+                run = false;
+                break;
+
+            case 'D':
+            case 'd':
+                nodelay(stdscr, FALSE); // Temporarily block
+                mvprintw(max_y - 3, max_x / 2 + 2, "POS to delete (last by default): ");
+                echo();
+                char pos_input[10];
+                getstr(pos_input);
+                noecho();
+                int pos;
+                if (strlen(pos_input) == 0) { 
+                    pos = cart_count - 1; 
+                }
+                else pos = atoi(pos_input) - 1;
+                if (pos >= 0 && pos < cart_count) {
+                    mvprintw(max_y - 3, max_x / 2 + 2, "Delete %-15.15s (%d)? (Y/n): ", shopping_cart[pos]->product, pos + 1);
+                    int confirm = getch();
+                    if (confirm != 'n' && confirm != 'N') {
+                        total -= shopping_cart[pos]->price;
+                        free(shopping_cart[pos]);
+                        for (int i = pos; i < cart_count - 1; i++) {
+                            shopping_cart[i] = shopping_cart[i + 1];
                         }
+                        cart_count--;
+                    } else {
+                        mvprintw(max_y - 2, max_x / 2 + 2, "Item not removed. Press key ...");
+                        curs_set(0);
+                        getch();
+                        curs_set(1);
                     }
                 } else {
-                    mvprintw(max_y - 2, 0, "Product not found. Press key ...");
-                    nodelay(stdscr, FALSE); // Temporarily block
+                    mvprintw(max_y - 2, max_x / 2 + 2, "Invalid position. Press key ...");
+                    curs_set(0);
                     getch();
-                    nodelay(stdscr, TRUE); // Restore non-blocking
+                    curs_set(1);
                 }
-                query1[0] = '\0'; // Clear the input field
-            } else if (ch == 'N' || ch == 'n') { // Switch to name search
+                nodelay(stdscr, TRUE); // Restore non-blocking
+                draw = true;
+                break;
+
+            case 'P':
+            case 'p':
+                if (show_window("Checkout? (Y/n)")) {
+                    save_transaction("transactions.csv", shopping_cart, cart_count, total);
+                    for (int i = 0; i < cart_count; i++) {
+                        free(shopping_cart[i]);
+                    }
+                    cart_count = 0;
+                    total = 0.0;
+                };
+                draw = true;
+                break;
+
+            case 'A':
+            case 'a':
+                nodelay(stdscr, FALSE); // Temporarily block
+                mvprintw(max_y - 3, 0, "Enter agent code (ENTER='no agent'): ");
+                echo();
+                char new_agent_code[20];
+                char psw[20];
+                getstr(new_agent_code);
+                mvprintw(max_y - 3, 0, "Enter agent password:                  ");
+                noecho();
+                get_password(max_y - 3, 22, psw, sizeof(psw));
+                if (validate_agent_and_password("agents.csv", new_agent_code, psw)) {
+                    strncpy(agent_code, new_agent_code, sizeof(agent_code) - 1);
+                    agent_code[sizeof(agent_code) - 1] = '\0';
+                    agent_login_time = time(NULL); // Record the login time
+                    authenticated = true;
+                } else {
+                    mvprintw(max_y - 2, 0, "Invalid agent code.");
+                    getch();
+                }
+                nodelay(stdscr, TRUE); // Restore non-blocking
+                break;
+
+            case 'N':
+            case 'n':
                 mvprintw(max_y - 3, 0, "Enter product name: ");
                 echo();
                 char product_name[50];                
@@ -1014,117 +1087,44 @@ int main() {
                             beep();
                         }
                     }
-                } else {
-                    mvprintw(max_y - 2, 0, "Product not found. Press key ...");
-                    nodelay(stdscr, FALSE); // Temporarily block
-                    getch();
-                    nodelay(stdscr, TRUE); // Restore non-blocking
                 }
-            } else if (ch == 'A' || ch == 'a') { // Change agent code
-                mvprintw(max_y - 3, 0, "Enter agent code (ENTER='no agent'): ");
-                echo();
-                char new_agent_code[20];
-                char psw[20];
-                nodelay(stdscr, FALSE); // Temporarily block
-                getstr(new_agent_code);
-                mvprintw(max_y - 3, 0, "Enter agent password:                  ");
-                noecho();
-                move(max_y - 3, 22);
-                get_password(max_y - 3, 22, psw, sizeof(psw));
-                nodelay(stdscr, TRUE); // Restore non-blocking
-                if (validate_agent_and_password("agents.csv", new_agent_code, psw)) {
-                    strncpy(agent_code, new_agent_code, sizeof(agent_code) - 1);
-                    agent_code[sizeof(agent_code) - 1] = '\0';
-                    agent_login_time = time(NULL); // Record the login time
-                    authenticated = true;
-                } else {
-                    mvprintw(max_y - 2, 0, "Invalid agent code.");
-                    nodelay(stdscr, FALSE); // Temporarily block
-                    getch();
-                    nodelay(stdscr, TRUE); // Restore non-blocking
-                }
-            } else if (ch == 'P' || ch == 'p') { // Checkout
-                if (show_window("Checkout? (Y/n)")) {
-                    // Guardar la transacción
-                    save_transaction("transactions.csv", shopping_cart, cart_count, total);
-                    // Limpiar el carrito
-                    for (int i = 0; i < cart_count; i++) {
-                        free(shopping_cart[i]);
-                    }
-                    cart_count = 0;
-                    total = 0.0;
-                };
-            } else if (ch == 'S' || ch == 's') { // Screenshot
-                system("scrot -u");
-            } else if (ch == 'D' || ch == 'd') { // Delete item
-                mvprintw(max_y - 3, max_x / 2 + 2, "POS to delete (last by default): ");
-                echo();
-                char pos_input[10];
-                getstr(pos_input);
-                noecho();
-                int pos;
-                if (strlen(pos_input) == 0) { 
-                    pos = cart_count - 1; 
-                }
-                else pos = atoi(pos_input) - 1;
-                if (pos >= 0 && pos < cart_count) {
-                    mvprintw(max_y - 2, max_x / 2 + 2, "Delete %s (%d)? (Y/n): ", shopping_cart[pos]->product, pos + 1);
-                    nodelay(stdscr, FALSE); // Temporarily block
-                    int confirm = getch();
-                    nodelay(stdscr, TRUE); // Restore non-blocking
-                    if (confirm != 'n' && confirm != 'N') {
-                        total -= shopping_cart[pos]->price;
-                        free(shopping_cart[pos]);
-                        for (int i = pos; i < cart_count - 1; i++) {
-                            shopping_cart[i] = shopping_cart[i + 1];
-                        }
-                        cart_count--;
-                    } else {
-                        mvprintw(max_y - 2, max_x / 2 + 2, "Item not removed. Press key ...");
-                        curs_set(0);
-                        nodelay(stdscr, FALSE);
-                        getch();
-                        nodelay(stdscr, TRUE);
-                        curs_set(1);
-                    }
-                } else {
-                    mvprintw(max_y - 2, max_x / 2 + 2, "Invalid position. Press key ...");
-                    curs_set(0);
-                    nodelay(stdscr, FALSE);
-                    getch();
-                    nodelay(stdscr, TRUE);
-                    curs_set(1);
-                }
-
-            } else if (ch == KEY_BACKSPACE || ch == 127) { // BACKSPACE key
-                if (input_mode == 1 && strlen(query1) > 0) {
-                    query1[strlen(query1) - 1] = '\0';
-                } else if (input_mode == 2 && strlen(query2) > 0) {
-                    query2[strlen(query2) - 1] = '\0';
-                }
-            } else if (ch == KEY_UP) { // Scroll up
-                if (scroll_offset > 0) {
-                    scroll_offset--;
-                }
-            } else if (ch == KEY_DOWN) { // Scroll down
-                if (scroll_offset < cart_count - (max_y - 3)) {
-                    scroll_offset++;
-                }
-            } else if (ch == 'q' || ch == 'Q') { // Quit
                 break;
-            } else if (isprint(ch)) { // Añadir caracteres al query1
-                int len = strlen(query1);
-                if (len < 13) {
-                    query1[len] = (char)ch;
-                    query1[len + 1] = '\0';
-                }
-            }
-        } 
+
+            case 10:
+            case KEY_ENTER:
+                // Añadir al carrito
+                Product *prod_ptr = malloc(sizeof(Product));
+                *prod_ptr = product;
+                shopping_cart[cart_count++] = prod_ptr;
+                total += product.price;
+                query1[0] = '\0'; // Clear the input field
+                if (beep_on_insert) beep();
+                draw = true;
+            
+            default:
+                int l = strlen(query1);
+                char text[50] = "";
+                strcpy(text, query1);
+                if (l < 13 && isprint(ch)) {
+                    query1[l] = (char)ch;
+                    query1[l + 1] = '\0';
+                    draw = true;
+                };
+                bool found = search_product_disk(query1, &product);
+                break;
+
+        }
+
         // Delay to refresh every 100ms for smooth updates
+        if (draw) {
+            draw_mainscreen();
+            draw = false;
+        }
+
+        draw_time();
         usleep(100000);
     }
 
-    // End ncurses mode
     finish();
     return 0;
 }
