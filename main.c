@@ -777,19 +777,25 @@ void print_text(int y, int x, const char *name, const char *value, ...) {
     int len = strlen(name);
     va_start(args, value);
     attron(COLOR_PAIR(5));
-    mvprintw(y, x, "%s", name);
-    mvaddch(y, x + len, ':');
+    mvprintw(y, x, "%s:", name);
+    //mvaddch(y, x + len, ':');
     attroff(COLOR_PAIR(5));
     move(y, x + len + 2);
     vwprintw(stdscr, value, args);
+    //mvprintw(y, x + len + 2, value, args);
     va_end(args);
 }
 
 void draw_time() {
     // Display current time in the top-right corner
+    curs_set(0);
+    int x=0, y=0;
+    getyx(stdscr, y, x);
+
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     char time_str[10];
+
     strftime(time_str, sizeof(time_str), "%H:%M:%S", t);
     mvprintw(0, max_x - strlen(time_str) - 1, "%s", time_str);
 
@@ -803,10 +809,58 @@ void draw_time() {
         mvprintw(0, 1, "Agent: - no agent -");
     else
         mvprintw(0, 1, "Agent: %s (%02d:%02d:%02d)", agent_code, hours, minutes, seconds);
+    move(x,y);
+    curs_set(1);
 }
+
+void update_mainscreen() {
+        curs_set(0);
+        mvprintw(2, 1, "CODE:");
+        attron(COLOR_PAIR(2));
+        mvprintw(2, 7, "%13s", query1);
+        attroff(COLOR_PAIR(2));
+        mvprintw(2, 21, "EAN13");
+
+        bool search = search_product_disk(query1, &product);
+        
+        print_text( 4, 1, "ID","%-13d", !search?0:product.ID);
+        //print_text( 5, 1, "Producto","%-38.38s", "----------------------------------------------------------------------------------------");
+        print_text( 5, 1, "Producto","%-38.38s", !search?"-":product.product);
+        print_text( 6, 1, "Stock","%-13d", !search?0:product.stock);
+        print_text( 7, 1, "Fabricante","%-36.36s", !search?"":product.fabricante);
+        print_text( 8, 1, "Proveedor","%-37.37s", !search?"":product.proveedor);
+        print_text( 9, 1, "Departamento","%-34.34s", !search?"":product.departamento);
+        print_text(10, 1, "Clase","%-38.38s", !search?"":product.clase);
+        print_text(11, 1, "Subclase","%-38.38s", !search?"":product.subclase);
+        print_text(12, 1, "Descripción 1","%-33.33s", !search?"":product.descripcion1);
+        print_text(14, 1, "Descripción 2","%-33.33s", !search?"":product.descripcion2);
+        print_text(16, 1, "Descripción 3","%-33.33s", !search?"":product.descripcion3);
+        print_text(18, 1, "Descripción 4","%-33.33s", !search?"":product.descripcion4);
+
+        print_text(20, 1, "Precio 1","%-7.2f", !search?0.0:product.price);
+        print_text(21, 1, "Precio 2","%-7.2f", !search?0.0:product.price01);
+        print_text(22, 1, "Precio 3","%-7.2f", !search?0.0:product.price02);
+        print_text(23, 1, "Precio 4","%-7.2f", !search?0.0:product.price03);
+        print_text(25, 1, "IVA","%-38.38s", !search?"":product.tipo_IVA);
+
+        // Right panel for shopping cart
+        int x_offset = max_x / 2 + 2;
+        attron(COLOR_PAIR(1));
+        mvprintw(0, x_offset + 2, "Total: %.2f", total);
+        mvprintw(0, max_x - 26, "[ticket %d]", ticket_id);
+        attroff(COLOR_PAIR(1));
+
+        for (int i = scroll_offset; i < cart_count && i - scroll_offset < max_y - 3; i++) {
+            mvprintw((i - scroll_offset) + 2, x_offset, "%c %03d %-25.25s - %7.2f", (i+1)==cart_count?'>':' ' , i + 1, shopping_cart[i]->product, shopping_cart[i]->price);
+        }
+        
+        curs_set(1);
+}
+
 
 void draw_mainscreen() {
         erase(); // Clear screen without flickering
+        curs_set(0);
         getmaxyx(stdscr, max_y, max_x);
 
         // Draw vertical separator
@@ -830,46 +884,6 @@ void draw_mainscreen() {
 
         mvaddch(1, max_x/2, ACS_TTEE);
         mvaddch(max_y - 2, max_x/2, ACS_BTEE);
-
-        mvprintw(2, 1, "CODE: ");
-        attron(COLOR_PAIR(2));
-        mvprintw(2, 7, "%13s", query1);
-        attroff(COLOR_PAIR(2));
-        mvprintw(2, 21, "EAN13");
-
-        bool search = search_product_disk(query1, &product);
-        
-        print_text( 4, 1, "ID","%d", !search?0:product.price);
-        print_text( 5, 1, "Producto","%s", !search?"-":product.product);
-        print_text( 6, 1, "Stock","%d", !search?0:product.stock);
-        print_text( 7, 1, "Fabricante","%s", !search?"":product.fabricante);
-        print_text( 8, 1, "Proveedor","%s", !search?"":product.proveedor);
-        print_text( 9, 1, "Departamento","%s", !search?"":product.departamento);
-        print_text(10, 1, "Clase","%s", !search?"":product.clase);
-        print_text(11, 1, "Subclase","%s", !search?"":product.subclase);
-        print_text(12, 1, "Descripción 1","%s", !search?"":product.descripcion1);
-        print_text(14, 1, "Descripción 2","%s", !search?"":product.descripcion2);
-        print_text(16, 1, "Descripción 3","%s", !search?"":product.descripcion3);
-        print_text(18, 1, "Descripción 4","%s", !search?"":product.descripcion4);
-
-        print_text(20, 1, "Precio 1","%.2f", !search?0.0:product.price);
-        print_text(21, 1, "Precio 2","%.2f", !search?0.0:product.price01);
-        print_text(22, 1, "Precio 3","%.2f", !search?0.0:product.price02);
-        print_text(23, 1, "Precio 4","%.2f", !search?0.0:product.price03);
-        print_text(25, 1, "IVA","%s", !search?"":product.tipo_IVA);
-
-        // Right panel for shopping cart
-        int x_offset = max_x / 2 + 2;
-        attron(COLOR_PAIR(1));
-        mvprintw(0, x_offset + 2, "Total: %.2f", total);
-        mvprintw(0, max_x - 26, "[ticket %d]", ticket_id);
-        attroff(COLOR_PAIR(1));
-
-        for (int i = scroll_offset; i < cart_count && i - scroll_offset < max_y - 3; i++) {
-            mvprintw((i - scroll_offset) + 2, x_offset, "%c %03d %-25.25s - %7.2f", (i+1)==cart_count?'>':' ' , i + 1, shopping_cart[i]->product, shopping_cart[i]->price);
-        }
-
-        // Footer
 
 #ifdef DEBUG
         static int ch_old;
@@ -903,8 +917,13 @@ void draw_mainscreen() {
 
         attroff(COLOR_PAIR(3));
 
+        move(2, 19); // Place the cursor at the end of the input field
         curs_set(1);
-        move(2, 19); // Place the cursor at the end of the input field    
+        /*
+        static int n = 0;
+        mvprintw(max_y - 2, 2, "draw_mainscreen: %d ", n);
+        n=n+1;
+        */
 }
 
 
@@ -917,8 +936,10 @@ int main() {
     initscr();
     cbreak();
     noecho(); // Disable echo for smoother UI
-    keypad(stdscr, TRUE);
-    nodelay(stdscr, TRUE); // Non-blocking input
+    curs_set(FALSE); // Ocultar el cursor
+    keypad(stdscr, TRUE); // Habilitar teclas especiales
+    nodelay(stdscr, TRUE); // Entrada non-blocking
+    
     start_color();
 
     // Define colors
@@ -939,11 +960,11 @@ int main() {
     int draw = true;
     int run = true;
 
+    //nodelay(stdscr, TRUE);
+    draw_mainscreen();
+
     while (run) {
-        // Non-blocking input
-        nodelay(stdscr, TRUE);
         ch = getch();
-        
         if (ch != ERR) 
         switch (ch) {
             case KEY_RESIZE:
@@ -1037,6 +1058,7 @@ int main() {
                     total = 0.0;
                 };
                 draw = true;
+                draw_mainscreen();
                 break;
 
             case 'A':
@@ -1117,7 +1139,7 @@ int main() {
 
         // Delay to refresh every 100ms for smooth updates
         if (draw) {
-            draw_mainscreen();
+            update_mainscreen();
             draw = false;
         }
 
