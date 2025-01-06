@@ -44,12 +44,14 @@ char agent_code[20] = "Default"; // Agent code
 time_t agent_login_time; // Time when the agent logged in
 
 Product product;
-char query1[50] = "\0";
+char query[50] = "\0";
 Product *shopping_cart[50];
 int cart_count = 0;
 float total = 0.0;
 int scroll_offset = 0; // Offset for scrolling
 int max_y, max_x;
+
+int n_field_edit = 0;
 
 // Función para cargar configuración desde config.ini
 void load_config(const char *filename) {
@@ -772,7 +774,7 @@ void finish(void) {
     exit(0);
 }
 
-void print_text(int y, int x, const char *name, const char *value, ...) {
+void print_text(int y, int x, bool edit, const char *name, const char *value, ...) {
     va_list args;
     int len = strlen(name);
     va_start(args, value);
@@ -781,7 +783,10 @@ void print_text(int y, int x, const char *name, const char *value, ...) {
     //mvaddch(y, x + len, ':');
     attroff(COLOR_PAIR(5));
     move(y, x + len + 2);
-    vwprintw(stdscr, value, args);
+
+    if (edit) attron(COLOR_PAIR(6));
+    vw_printw(stdscr, value, args);
+    if (edit) attroff(COLOR_PAIR(6));
     //mvprintw(y, x + len + 2, value, args);
     va_end(args);
 }
@@ -789,9 +794,6 @@ void print_text(int y, int x, const char *name, const char *value, ...) {
 void draw_time() {
     // Display current time in the top-right corner
     curs_set(0);
-    int x=0, y=0;
-    getyx(stdscr, y, x);
-
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     char time_str[10];
@@ -809,39 +811,39 @@ void draw_time() {
         mvprintw(0, 1, "Agent: - no agent -");
     else
         mvprintw(0, 1, "Agent: %s (%02d:%02d:%02d)", agent_code, hours, minutes, seconds);
-    move(x,y);
+    move(2,19);
     curs_set(1);
 }
 
 void update_mainscreen() {
         curs_set(0);
         mvprintw(2, 1, "CODE:");
-        attron(COLOR_PAIR(2));
-        mvprintw(2, 7, "%13s", query1);
-        attroff(COLOR_PAIR(2));
+        attron(COLOR_PAIR(6));
+        mvprintw(2, 7, "%13s", query);
+        attroff(COLOR_PAIR(6));
         mvprintw(2, 21, "EAN13");
 
-        bool search = search_product_disk(query1, &product);
+        bool search = search_product_disk(query, &product);
         
-        print_text( 4, 1, "ID","%-13d", !search?0:product.ID);
+        print_text( 4, 1, n_field_edit == 1?true:false, "ID","%-13d", !search?0:product.ID);
         //print_text( 5, 1, "Producto","%-38.38s", "----------------------------------------------------------------------------------------");
-        print_text( 5, 1, "Producto","%-38.38s", !search?"-":product.product);
-        print_text( 6, 1, "Stock","%-13d", !search?0:product.stock);
-        print_text( 7, 1, "Fabricante","%-36.36s", !search?"":product.fabricante);
-        print_text( 8, 1, "Proveedor","%-37.37s", !search?"":product.proveedor);
-        print_text( 9, 1, "Departamento","%-34.34s", !search?"":product.departamento);
-        print_text(10, 1, "Clase","%-38.38s", !search?"":product.clase);
-        print_text(11, 1, "Subclase","%-38.38s", !search?"":product.subclase);
-        print_text(12, 1, "Descripción 1","%-33.33s", !search?"":product.descripcion1);
-        print_text(14, 1, "Descripción 2","%-33.33s", !search?"":product.descripcion2);
-        print_text(16, 1, "Descripción 3","%-33.33s", !search?"":product.descripcion3);
-        print_text(18, 1, "Descripción 4","%-33.33s", !search?"":product.descripcion4);
+        print_text( 5, 1, n_field_edit == 2?true:false, "Producto","%-38.38s", !search?"-":product.product);
+        print_text( 6, 1, n_field_edit == 3?true:false, "Stock","%-13d", !search?0:product.stock);
+        print_text( 7, 1, n_field_edit == 4?true:false, "Fabricante","%-36.36s", !search?"":product.fabricante);
+        print_text( 8, 1, n_field_edit == 5?true:false, "Proveedor","%-37.37s", !search?"":product.proveedor);
+        print_text( 9, 1, n_field_edit == 6?true:false, "Departamento","%-34.34s", !search?"":product.departamento);
+        print_text(10, 1, n_field_edit == 7?true:false, "Clase","%-38.38s", !search?"":product.clase);
+        print_text(11, 1, n_field_edit == 8?true:false, "Subclase","%-38.38s", !search?"":product.subclase);
+        print_text(12, 1, n_field_edit == 9?true:false, "Descripción 1","%-33.33s", !search?"":product.descripcion1);
+        print_text(14, 1, n_field_edit == 10?true:false, "Descripción 2","%-33.33s", !search?"":product.descripcion2);
+        print_text(16, 1, n_field_edit == 11?true:false, "Descripción 3","%-33.33s", !search?"":product.descripcion3);
+        print_text(18, 1, n_field_edit == 12?true:false, "Descripción 4","%-33.33s", !search?"":product.descripcion4);
 
-        print_text(20, 1, "Precio 1","%-7.2f", !search?0.0:product.price);
-        print_text(21, 1, "Precio 2","%-7.2f", !search?0.0:product.price01);
-        print_text(22, 1, "Precio 3","%-7.2f", !search?0.0:product.price02);
-        print_text(23, 1, "Precio 4","%-7.2f", !search?0.0:product.price03);
-        print_text(25, 1, "IVA","%-38.38s", !search?"":product.tipo_IVA);
+        print_text(20, 1, n_field_edit == 13?true:false, "Precio 1","%-7.2f", !search?0.0:product.price);
+        print_text(21, 1, n_field_edit == 14?true:false, "Precio 2","%-7.2f", !search?0.0:product.price01);
+        print_text(22, 1, n_field_edit == 15?true:false, "Precio 3","%-7.2f", !search?0.0:product.price02);
+        print_text(23, 1, n_field_edit == 16?true:false, "Precio 4","%-7.2f", !search?0.0:product.price03);
+        print_text(25, 1, n_field_edit == 17?true:false, "IVA","%-38.38s", !search?"":product.tipo_IVA);
 
         // Right panel for shopping cart
         int x_offset = max_x / 2 + 2;
@@ -908,7 +910,7 @@ void draw_mainscreen() {
 
         attroff(COLOR_PAIR(3));
 
-        move(2, 19); // Place the cursor at the end of the input field
+        //move(2, 19); // Place the cursor at the end of the input field
         curs_set(1);
         /*
         static int n = 0;
@@ -938,12 +940,14 @@ int main() {
     init_color(COLOR_BLUE, 0, 0, 500);
     init_color(COLOR_YELLOW, 1000, 1000, 0);
     init_color(COLOR_RED, 811, 284, 0);
+    init_color(COLOR_MAGENTA, 0, 200, 0);
 
     init_pair(1, COLOR_GREEN, COLOR_BLACK);
     init_pair(2, COLOR_WHITE, COLOR_CYAN);
     init_pair(3, COLOR_WHITE, COLOR_BLUE);
     init_pair(4, COLOR_YELLOW, COLOR_BLUE);
     init_pair(5, COLOR_RED, COLOR_BLACK);
+    init_pair(6, COLOR_GREEN, COLOR_MAGENTA);
 
     agent_login_time = time(NULL); // Record the login time
     
@@ -971,12 +975,15 @@ int main() {
 
             case 'S':
             case 's':
-                system("scrot -u");
+                int ret = system("scrot -u");
+                if (ret != 0) {
+                    fprintf(stderr, "Error executing system command.\n");
+                }
                 break;
 
             case KEY_BACKSPACE:
             case 127:
-                query1[strlen(query1) - 1] = '\0';
+                query[strlen(query) - 1] = '\0';
                 draw = true;
                 break;
 
@@ -985,6 +992,8 @@ int main() {
                     scroll_offset--;
                     draw = true;
                 }
+                n_field_edit = n_field_edit - 1;
+                draw = true;
                 break;
 
             case KEY_DOWN:
@@ -992,6 +1001,8 @@ int main() {
                     scroll_offset++;
                     draw = true;
                 }
+                n_field_edit = n_field_edit + 1;
+                draw = true;
                 break;
 
             case 'Q':
@@ -1110,20 +1121,20 @@ int main() {
                 *prod_ptr = product;
                 shopping_cart[cart_count++] = prod_ptr;
                 total += product.price;
-                query1[0] = '\0'; // Clear the input field
+                query[0] = '\0'; // Clear the input field
                 if (beep_on_insert) beep();
                 draw = true;
             
             default:
-                int l = strlen(query1);
+                int l = strlen(query);
                 char text[50] = "";
-                strcpy(text, query1);
+                strcpy(text, query);
                 if (l < 13 && isprint(ch)) {
-                    query1[l] = (char)ch;
-                    query1[l + 1] = '\0';
+                    query[l] = (char)ch;
+                    query[l + 1] = '\0';
                     draw = true;
                 };
-                bool found = search_product_disk(query1, &product);
+                bool found = search_product_disk(query, &product);
                 break;
 
         }
