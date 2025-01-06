@@ -32,26 +32,17 @@ typedef struct {
 } Product;
 
 
-<<<<<<< HEAD
-=======
 // Configuración y otras variables globales
->>>>>>> 2d01d40c9a73526f1dd2c0ef93ef9738011250dc
 bool beep_on_insert = false;
 char currency_symbol[10] = "$";
 bool hide_currency_symbol = false;
 bool currency_after_amount = false;
-<<<<<<< HEAD
-
-=======
->>>>>>> 2d01d40c9a73526f1dd2c0ef93ef9738011250dc
 bool authenticated = false;
 int ticket_id;
 
 char agent_code[20] = "Default"; // Agent code
 time_t agent_login_time; // Time when the agent logged in
 
-<<<<<<< HEAD
-=======
 Product product;
 char query1[50] = "\0";
 Product *shopping_cart[50];
@@ -60,7 +51,6 @@ float total = 0.0;
 int scroll_offset = 0; // Offset for scrolling
 int max_y, max_x;
 
->>>>>>> 2d01d40c9a73526f1dd2c0ef93ef9738011250dc
 // Función para cargar configuración desde config.ini
 void load_config(const char *filename) {
     FILE *file = fopen(filename, "r");
@@ -96,11 +86,6 @@ void load_config(const char *filename) {
 
     fclose(file);
 }
-<<<<<<< HEAD
-// Function to load products from a CSV file
-void load_products(const char *filename) {
-    FILE *file = fopen(filename, "r");
-=======
 
 // Función para buscar un producto en el archivo binario
 bool search_product_disk(const char *query, Product *result) {
@@ -129,7 +114,6 @@ bool search_product_disk(const char *query, Product *result) {
 // Función para añadir un producto al archivo binario
 bool add_product_disk(const Product *prod) {
     FILE *file = fopen("products.dat", "ab");
->>>>>>> 2d01d40c9a73526f1dd2c0ef93ef9738011250dc
     if (!file) {
         perror("Error opening binary product file for appending");
         return false;
@@ -350,18 +334,12 @@ void list_tickets(const char *filename) {
         if (sscanf(line, "Ticket %d, Agent: %19[^,], Date: %19[^,], Total: %f", &ticket_id, agent, date, &total) == 4) {
             ticket_ids[ticket_count] = ticket_id;
             strncpy(ticket_dates[ticket_count], date, sizeof(ticket_dates[ticket_count]) - 1);
-<<<<<<< HEAD
-            strncpy(ticket_agents[ticket_count], agent, sizeof(ticket_agents[ticket_count]) - 1);
-            ticket_totals[ticket_count] = total;
-            ticket_count++;
-=======
             ticket_dates[ticket_count][sizeof(ticket_dates[ticket_count]) - 1] = '\0';
             strncpy(ticket_agents[ticket_count], agent, sizeof(ticket_agents[ticket_count]) - 1);
             ticket_agents[ticket_count][sizeof(ticket_agents[ticket_count]) - 1] = '\0';
             ticket_totals[ticket_count] = total;
             ticket_count++;
             if (ticket_count >= 1000) break; // Limitar a 1000 tickets
->>>>>>> 2d01d40c9a73526f1dd2c0ef93ef9738011250dc
         }
     }
 
@@ -390,11 +368,7 @@ void list_tickets(const char *filename) {
             end_index = -1;
         }
 
-<<<<<<< HEAD
-        for (int i = start_index, row = 2; i > end_index; i--, row++) {
-=======
         for (int i = start_index, row = 2; i > end_index && i >= 0; i--, row++) {
->>>>>>> 2d01d40c9a73526f1dd2c0ef93ef9738011250dc
             if (i == ticket_count - 1 - current_selection) {
                 attron(A_REVERSE);
                 if (hide_currency_symbol) {
@@ -488,9 +462,9 @@ bool show_window(const char *msg) {
     // En muchas configuraciones getch() devuelve '\n' al pulsar ENTER.
 
     // Borrar la ventana
-    werase(prompt_win);
-    wrefresh(prompt_win);
-    delwin(prompt_win);
+    //werase(prompt_win);
+    //wrefresh(prompt_win);
+    //delwin(prompt_win);
     curs_set(1);
     return(respuesta_si);
 }
@@ -812,18 +786,11 @@ void print_text(int y, int x, const char *name, const char *value, ...) {
     va_end(args);
 }
 
-<<<<<<< HEAD
-    load_config("config.ini");
-
-    // Load products from CSV
-    load_products("products.csv");
-=======
 void draw_time() {
     // Display current time in the top-right corner
     curs_set(0);
     int x=0, y=0;
     getyx(stdscr, y, x);
->>>>>>> 2d01d40c9a73526f1dd2c0ef93ef9738011250dc
 
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
@@ -892,7 +859,7 @@ void update_mainscreen() {
 
 
 void draw_mainscreen() {
-        erase(); // Clear screen without flickering
+        erase();
         curs_set(0);
         getmaxyx(stdscr, max_y, max_x);
 
@@ -910,21 +877,13 @@ void draw_mainscreen() {
         }
 
         // Esquinas
-        mvaddch(1, 0, ACS_ULCORNER);                         // esquina sup izq
-        mvaddch(1, max_x - 1, ACS_URCORNER);                 // esquina sup der
-        mvaddch(max_y - 2, 0, ACS_LLCORNER);                // esquina inf izq
-        mvaddch(max_y - 2, max_x - 1, ACS_LRCORNER);        // esquina inf der
+        mvaddch(1, 0, ACS_ULCORNER);                   // esquina sup izq
+        mvaddch(1, max_x - 1, ACS_URCORNER);           // esquina sup der
+        mvaddch(max_y - 2, 0, ACS_LLCORNER);           // esquina inf izq
+        mvaddch(max_y - 2, max_x - 1, ACS_LRCORNER);   // esquina inf der
 
         mvaddch(1, max_x/2, ACS_TTEE);
         mvaddch(max_y - 2, max_x/2, ACS_BTEE);
-
-#ifdef DEBUG
-        static int ch_old;
-        if (ch != -1) {
-            ch_old = ch;
-        }
-        mvprintw(max_y - 2, 0, "KEY: %d", ch_old);
-#endif
 
         attron(COLOR_PAIR(3));
 
@@ -935,13 +894,12 @@ void draw_mainscreen() {
 
         // Menu inferior
         mvprintw(max_y - 1, 0, " Agent  Management");
-        mvchgat(max_y - 1, 1, 1, A_COLOR, 4, NULL); // BACKGROUND COLOR
-        mvchgat(max_y - 1, 8, 1, A_COLOR, 4, NULL); // BACKGROUND COLOR
+        mvchgat(max_y - 1, 1, 1, A_COLOR, 4, NULL);
+        mvchgat(max_y - 1, 8, 1, A_COLOR, 4, NULL);
 
-        mvprintw(max_y - 1, max_x / 2 + 1, " Pay  Delete ");
-        mvchgat(max_y - 1, max_x / 2 + 2, 1, A_COLOR, 4, NULL); // BACKGROUND COLOR
-        mvchgat(max_y - 1, max_x / 2 + 7, 1, A_COLOR, 4, NULL); // BACKGROUND COLOR
-
+        mvprintw(max_y - 1, max_x / 2 + 1, " Pay  Delete");
+        mvchgat(max_y - 1, max_x / 2 + 2, 1, A_COLOR, 4, NULL);
+        mvchgat(max_y - 1, max_x / 2 + 7, 1, A_COLOR, 4, NULL);
 
         // Scroll instructions if needed
         if (cart_count > max_y - 3) {
@@ -1175,6 +1133,14 @@ int main() {
             update_mainscreen();
             draw = false;
         }
+
+        #ifdef DEBUG
+        static int ch_old;
+        if (ch != -1) {
+            ch_old = ch;
+        }
+        mvprintw(max_y - 2, 0, "KEY: %d", ch_old);
+        #endif
 
         draw_time();
         usleep(100000);
