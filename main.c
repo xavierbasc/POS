@@ -40,6 +40,8 @@ bool currency_after_amount = false;
 bool authenticated = false;
 int ticket_id;
 
+int cursor_x, cursor_y;
+
 char agent_code[20] = "Default"; // Agent code
 time_t agent_login_time; // Time when the agent logged in
 
@@ -788,6 +790,13 @@ void print_text(int y, int x, bool edit, const char *name, const char *value, ..
     vw_printw(stdscr, value, args);
     if (edit) attroff(COLOR_PAIR(6));
     //mvprintw(y, x + len + 2, value, args);
+
+    if (edit) {
+        char tmp[256];
+        cursor_y = y;
+        sprintf(tmp, value, args);
+        cursor_x = x + strlen(tmp) + 5;
+    }
     va_end(args);
 }
 
@@ -811,22 +820,18 @@ void draw_time() {
         mvprintw(0, 1, "Agent: - no agent -");
     else
         mvprintw(0, 1, "Agent: %s (%02d:%02d:%02d)", agent_code, hours, minutes, seconds);
-    move(2,19);
+    move(cursor_y,cursor_x);
     curs_set(1);
 }
 
 void update_mainscreen() {
         curs_set(0);
-        mvprintw(2, 1, "CODE:");
-        attron(COLOR_PAIR(6));
-        mvprintw(2, 7, "%13s", query);
-        attroff(COLOR_PAIR(6));
-        mvprintw(2, 21, "EAN13");
-
         bool search = search_product_disk(query, &product);
-        
+        //if (strlen(query)>0) search_product_disk(query, &product);
+
+        //mvprintw(2, 7, "%13s", query);
+        print_text( 2, 1, n_field_edit == 0?true:false, "CODE","%-13.13s", strlen(query)==0?"-":query);
         print_text( 4, 1, n_field_edit == 1?true:false, "ID","%-13d", !search?0:product.ID);
-        //print_text( 5, 1, "Producto","%-38.38s", "----------------------------------------------------------------------------------------");
         print_text( 5, 1, n_field_edit == 2?true:false, "Producto","%-38.38s", !search?"-":product.product);
         print_text( 6, 1, n_field_edit == 3?true:false, "Stock","%-13d", !search?0:product.stock);
         print_text( 7, 1, n_field_edit == 4?true:false, "Fabricante","%-36.36s", !search?"":product.fabricante);
@@ -987,7 +992,7 @@ int main() {
                 draw = true;
                 break;
 
-            case KEY_UP:
+            case KEY_BTAB:
                 if (scroll_offset > 0) {
                     scroll_offset--;
                     draw = true;
@@ -996,7 +1001,7 @@ int main() {
                 draw = true;
                 break;
 
-            case KEY_DOWN:
+            case 9: //TAB
                 if (scroll_offset < cart_count - (max_y - 3)) {
                     scroll_offset++;
                     draw = true;
