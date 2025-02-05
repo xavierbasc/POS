@@ -3,10 +3,6 @@
 ## Prerequisites
 sudo apt-get install libncurses5-dev libncursesw5-dev
 
-<<<<<<< HEAD
-CSV test:
-https://www.mockaroo.com/
-=======
 
 # Product Converter
 
@@ -111,4 +107,3 @@ Then run it in one of the following ways:
 - If there are malformed lines in the CSV (for instance, fewer than 8 fields), an error message is printed and those lines are skipped.
 
 Enjoy converting your product data between CSV and binary as needed!
->>>>>>> 2d01d40c9a73526f1dd2c0ef93ef9738011250dc

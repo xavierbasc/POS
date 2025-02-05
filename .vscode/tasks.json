@@ -2,15 +2,31 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build POS Application",
+            "label": "build form",
             "type": "shell",
-            "command": "make",
+            "command": "gcc",
+            "args": [
+                "-g",
+                "main.c",
+                "-o",
+                "pos",
+                //"-lnotcurses"
+                "-lncurses",
+                "-lform"
+                // Si ncurses está en una ruta personalizada, por ejemplo:
+                // "-I/usr/local/opt/ncurses/include",
+                // "-L/usr/local/opt/ncurses/lib"
+            ],
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
-            "problemMatcher": [],
-            "detail": "Build the project using the Makefile"
+            "presentation": {
+                "reveal": "always"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
         }
     ]
 }
