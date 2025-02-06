@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 #define N_FIELDS 25
 #define X_FIELDS 17
@@ -15,10 +16,30 @@
 #define X_TICKET COLS/2 + 2
 #define Y_TICKET 2
 
+// Application mode status
+#define M_POS 0
+#define M_PRODUCT_EDIT 1
+#define M_PRODUCT_LIST 2
+
+// Variables globales
+
 static FORM *f_product;
 static FIELD *fields[N_FIELDS];
+char username[50];
 
+int mode = M_POS;
 
+static char* trim_whitespaces(char *str);
+int print(WINDOW *win, int y, int x, const char *fmt, ...);
+void top_refresh();
+void mode_change(int mode);
+static void driver(int ch);
+FIELD * set_field(int height, int width, int toprow, int leftcol, int offscreen, int nbuffers);
+void rectangle(int y1, int x1, int y2, int x2);
+void vertical(int y1, int x1, int y2, int x2);
+void create_form(FIELD *fields[], FORM *form);
+void ticket_render();
+void draw_screen();
 
 /* Función auxiliar para quitar espacios al inicio y al final de una cadena */
 static char* trim_whitespaces(char *str)
@@ -39,19 +60,124 @@ static char* trim_whitespaces(char *str)
     return str;
 }
 
+
+int print(WINDOW *win, int y, int x, const char *fmt, ...) {
+    int cur_y, cur_x;
+    getyx(win, cur_y, cur_x);
+    wmove(win, y, x);
+    va_list args;
+    va_start(args, fmt);
+    int ret = vw_printw(win, fmt, args);
+    va_end(args);
+    wmove(win, cur_y, cur_x);
+    return ret;
+}
+
+
+void top_refresh()
+{
+    //clrtoeol();
+    char mode_str[50];
+    switch (mode) {
+        case M_POS:
+            strcpy(mode_str, "POS");
+            break;
+        case M_PRODUCT_EDIT:
+            strcpy(mode_str, "PRODUCT (EDIT)");
+            break;
+        case M_PRODUCT_LIST:
+            strcpy(mode_str, "PRODUCT (LIST)");
+            break;
+    }
+    attron(COLOR_PAIR(4));
+    print(stdscr, 0, 2, "MODE: %-20s", mode_str);
+    print(stdscr, 0, 27, "USER: %-10s", username);
+}
+
+
+void mode_change(int mode)
+{
+    switch (mode) {
+        case M_POS:
+            set_current_field(f_product, fields[0]);
+            form_driver(f_product, REQ_END_LINE);
+            pos_form_cursor(f_product);
+
+            for (int i = 0; fields[i] != NULL; i++)
+            {
+                set_field_opts(fields[i], O_VISIBLE | O_PUBLIC);
+                set_field_fore(fields[i], COLOR_PAIR(2));
+                set_field_back(fields[i], COLOR_PAIR(2));
+            }
+            // CODE (EAN, etc):
+            set_field_fore(fields[0], COLOR_PAIR(6));
+            set_field_back(fields[0], COLOR_PAIR(6));
+            break;
+
+        case M_PRODUCT_LIST:
+        case M_PRODUCT_EDIT:
+            set_current_field(f_product, fields[0]);
+            form_driver(f_product, REQ_END_LINE);
+            pos_form_cursor(f_product);
+
+            for (int i = 0; fields[i] != NULL; i++)
+            {
+                set_field_opts(fields[i], O_VISIBLE | O_PUBLIC | O_EDIT | O_ACTIVE | O_NULLOK);
+                set_field_fore(fields[i], COLOR_PAIR(5));
+                set_field_back(fields[i], COLOR_PAIR(5));
+            }
+            // CODE (EAN, etc):
+            set_field_fore(fields[0], COLOR_PAIR(6));
+            set_field_back(fields[0], COLOR_PAIR(6));
+            // ID:
+            set_field_opts(fields[1], O_VISIBLE | O_PUBLIC);
+            set_field_fore(fields[1], COLOR_PAIR(2));
+            set_field_back(fields[1], COLOR_PAIR(2));
+            break;
+
+        default:
+            break;
+    };
+    refresh();
+}
+
 /* Función de manejo de entrada: procesa las teclas presionadas y
  * actualiza el formulario y la ventana en consecuencia.
  */
 static void driver(int ch)
 {
-    int i;
     switch (ch) {
-        case KEY_F(2): /* Sincronizar el buffer del campo actual */
+        case KEY_F(2):
+            switch (mode) {
+                case M_POS:
+                    mode = M_PRODUCT_EDIT;
+                    draw_screen();
+                    mode_change(mode);
+                    break;
+
+                case M_PRODUCT_EDIT:
+                    mode = M_PRODUCT_LIST;
+                    draw_screen();
+                    mode_change(mode);
+                    break;
+                
+                case M_PRODUCT_LIST:
+                    mode = M_POS;
+                    draw_screen();
+                    mode_change(mode);
+                    break;
+                
+                default:
+                    break;
+            }
+            
+            break;
+        case KEY_F(5): /* Sincronizar el buffer del campo actual */
             form_driver(f_product, REQ_NEXT_FIELD);
             form_driver(f_product, REQ_PREV_FIELD);
             move(LINES - 3, 2);
             clrtoeol();
-            for (i = 0; fields[i] != NULL; i++) {
+            for (int i = 0; fields[i] != NULL; i++) {
                 printw("%s", trim_whitespaces(field_buffer(fields[i], 0)));
                 if (field_opts(fields[i]) & O_ACTIVE)
                     printw("\"\t");
@@ -101,13 +227,9 @@ static void driver(int ch)
 FIELD * set_field(int height, int width, int toprow, int leftcol, int offscreen, int nbuffers)
 {
     FIELD *field = new_field(height, width, toprow, leftcol, offscreen, nbuffers);
-    //set_field_buffer(field, 0, "-");
-    set_field_opts(field, O_VISIBLE | O_PUBLIC | O_EDIT | O_ACTIVE);
-    set_field_fore(field, COLOR_PAIR(5) | A_UNDERLINE);
-    set_field_back(field, COLOR_PAIR(5) | A_UNDERLINE);
     set_field_just(field, JUSTIFY_LEFT);
     field_opts_off(field, O_AUTOSKIP);     // Evitar el avance automático
-
+    //set_field_buffer(field, 0, "-");
     return field;
 }
 
@@ -125,7 +247,6 @@ void rectangle(int y1, int x1, int y2, int x2)
 
 void vertical(int y1, int x1, int y2, int x2)
 {
-    // Separadores verticales
     for (int y = 2; y < LINES - 2; y++) {
         mvaddch(y, 0, ACS_VLINE);
         mvaddch(y, COLS / 2, ACS_VLINE);
@@ -133,15 +254,8 @@ void vertical(int y1, int x1, int y2, int x2)
     }
 }
 
-
-/* Función para crear las ventanas, el formulario y dibujar las etiquetas */
-void screen_main_create()
+void create_form(FIELD *fields[], FORM *form) 
 {
-    /* Crear la ventana principal (body) y la subventana para el formulario */
-    //w_home = newwin(LINES-2, COLS, 0, 0);
-    //box(w_home, 0, 0);
-
-    /* Configurar las opciones de cada campo */
     fields[ 0] = set_field(1, 13,  0+Y_FIELDS, X_FIELDS, 0, 1);  // CODE
     fields[ 1] = set_field(1, 13,  2+Y_FIELDS, X_FIELDS, 0, 1);  // ID
     fields[ 2] = set_field(1, 40,  3+Y_FIELDS, X_FIELDS, 0, 1);  // Producto
@@ -165,34 +279,7 @@ void screen_main_create()
 
     f_product = new_form(fields);
     post_form(f_product);
-	refresh(); // Sin este refresh descuadran los fields
-
-    // Dibujado de bordes
-    attron(COLOR_PAIR(4));
-    rectangle(1, 0, LINES-2, COLS-1);
-    vertical(1, COLS/2, LINES-2, COLS/2);
-    mvaddch(1, COLS/2, ACS_TTEE);
-    mvaddch(LINES - 2, COLS/2, ACS_BTEE);
-
-    attron(COLOR_PAIR(2));
-    mvwprintw(stdscr,  0+Y_FIELDS, 2, "CODE:");
-    attron(COLOR_PAIR(4));
-    mvwprintw(stdscr,  2+Y_FIELDS, 2, "ID:");
-    mvwprintw(stdscr,  3+Y_FIELDS, 2, "Producto:");
-    mvwprintw(stdscr,  4+Y_FIELDS, 2, "Stock:");
-    mvwprintw(stdscr,  6+Y_FIELDS, 2, "Fabricante:");
-    mvwprintw(stdscr,  7+Y_FIELDS, 2, "Proveedor:");
-    mvwprintw(stdscr,  9+Y_FIELDS, 2, "Departamento:");
-    mvwprintw(stdscr, 10+Y_FIELDS, 2, "Clase:");
-    mvwprintw(stdscr, 11+Y_FIELDS, 2, "Subclase:");
-    mvwprintw(stdscr, 13+Y_FIELDS, 2, "Descripción 1:");
-    mvwprintw(stdscr, 16+Y_FIELDS, 2, "Descripción 2:");
-    mvwprintw(stdscr, 27+Y_FIELDS, 2, "Precio 1:");
-    mvwprintw(stdscr, 28+Y_FIELDS, 2, "Precio 2:");
-    mvwprintw(stdscr, 29+Y_FIELDS, 2, "Precio 3:");
-    mvwprintw(stdscr, 30+Y_FIELDS, 2, "Precio 4:");
-    mvwprintw(stdscr, 32+Y_FIELDS, 2, "IVA:");
-	refresh();
+    refresh();
 }
 
 void ticket_render()
@@ -205,11 +292,54 @@ void ticket_render()
 }
 
 
+/* Función para crear las ventanas, el formulario y dibujar las etiquetas */
+void draw_screen()
+{
+    clear();
+    top_refresh();
+    attron(COLOR_PAIR(4));
+    rectangle(1, 0, LINES-2, COLS-1);
+    vertical(1, COLS/2, LINES-2, COLS/2);
+    mvaddch(1, COLS/2, ACS_TTEE);
+    mvaddch(LINES - 2, COLS/2, ACS_BTEE);
+
+    attron(COLOR_PAIR(2));
+    mvwprintw(stdscr,  0+Y_FIELDS, 2, "CODE:");
+    attron(COLOR_PAIR(4));
+    mvwprintw(stdscr,  2+Y_FIELDS, 2, "[ID]:");
+    mvwprintw(stdscr,  3+Y_FIELDS, 2, "Producto:");
+    mvwprintw(stdscr,  4+Y_FIELDS, 2, "Stock:");
+    mvwprintw(stdscr,  5+Y_FIELDS, X_FIELDS, "--------");
+    mvwprintw(stdscr,  6+Y_FIELDS, 2, "Fabricante:");
+    mvwprintw(stdscr,  7+Y_FIELDS, 2, "Proveedor:");
+    mvwprintw(stdscr,  8+Y_FIELDS, X_FIELDS, "--------");
+    mvwprintw(stdscr,  9+Y_FIELDS, 2, "Departamento:");
+    mvwprintw(stdscr, 10+Y_FIELDS, 2, "Clase:");
+    mvwprintw(stdscr, 11+Y_FIELDS, 2, "Subclase:");
+    mvwprintw(stdscr, 12+Y_FIELDS, X_FIELDS, "--------");
+    mvwprintw(stdscr, 13+Y_FIELDS, 2, "Descripción 1:");
+    mvwprintw(stdscr, 15+Y_FIELDS, X_FIELDS, "--------");
+    mvwprintw(stdscr, 16+Y_FIELDS, 2, "Descripción 2:");
+    mvwprintw(stdscr, 26+Y_FIELDS, X_FIELDS, "--------");
+    mvwprintw(stdscr, 27+Y_FIELDS, 2, "Precio 1:");
+    mvwprintw(stdscr, 28+Y_FIELDS, 2, "Precio 2:");
+    mvwprintw(stdscr, 29+Y_FIELDS, 2, "Precio 3:");
+    mvwprintw(stdscr, 30+Y_FIELDS, 2, "Precio 4:");
+    mvwprintw(stdscr, 31+Y_FIELDS, X_FIELDS, "--------");
+    mvwprintw(stdscr, 32+Y_FIELDS, 2, "IVA:");
+
+    attron(COLOR_PAIR(2));
+    mvwprintw(stdscr, LINES-1, 1, "F1: Quit F2: Mode");
+
+    ticket_render();
+    refresh();
+}
+
 
 int main(void)
 {
     int ch;
-
+    strcpy(username, "guest");
     /* Inicialización de ncurses */
     initscr();
     cbreak();
@@ -231,22 +361,9 @@ int main(void)
     init_pair(5, COLOR_RED,    COLOR_MAGENTA);
     init_pair(6, COLOR_YELLOW, COLOR_BLUE);
 
-    clear();
-    screen_main_create();
-    ticket_render();
-
-    /* Instrucciones en la parte inferior de la pantalla */
-    attron(COLOR_PAIR(2));
-    mvwprintw(stdscr, LINES-1, 1, "Press F1 to quit and F2 to print fields content");
-    attroff(COLOR_PAIR(2));
-    refresh();
-
-    /* Establecer el primer campo como activo */
-    set_current_field(f_product, fields[0]);
-    form_driver(f_product, REQ_END_LINE);
-    pos_form_cursor(f_product);
-    refresh();
-
+    create_form(fields, f_product);
+    draw_screen();
+    mode_change(mode);
     /* Bucle principal: se procesa la entrada */
     while ((ch = getch()) != KEY_F(1))
         driver(ch);
