@@ -9,6 +9,8 @@
         "typeinfo": "c",
         "stdio.h": "c",
         "locale": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "string.h": "c",
+        "stdarg.h": "c"
     }
 }

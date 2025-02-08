@@ -1,378 +1,430 @@
 /*
- * How to run:
- *   gcc -Wall -Werror -g -pedantic -o pos main.c -lform -lncurses
+ * Programa de ejemplo para UI de texto con manejo de colores, detección del tamaño de terminal,
+ * campos de texto subrayados y edición con soporte para flechas de dirección.
+ *
+ * Compilación:
+ *   Linux/macOS:
+ *      gcc -Os -s -flto -o text_ui text_ui.c
+ *
+ *   Windows (MinGW):
+ *      gcc -Os -s -flto -o text_ui.exe text_ui.c
  */
-#include <ncurses.h>
-#include <form.h>
-#include <assert.h>
-#include <string.h>
+
+#include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
-#include <stdarg.h>
+#include <string.h>
 
-#define N_FIELDS 25
-#define X_FIELDS 17
-#define Y_FIELDS 2
-#define X_TICKET COLS/2 + 2
-#define Y_TICKET 2
+#ifdef _WIN32
+    #include <windows.h>
+    #include <conio.h>
+#else
+    #include <sys/ioctl.h>
+    #include <unistd.h>
+    #include <termios.h>
+#endif
 
-// Application mode status
-#define M_POS 0
-#define M_PRODUCT_EDIT 1
-#define M_PRODUCT_LIST 2
+/* =========================== */
+/* Definición para tamaño de terminal */
+/* =========================== */
+typedef struct {
+    int rows;
+    int cols;
+} TerminalSize;
 
-// Variables globales
+#define NUM_FIELDS 12
+#define FIELD_LABEL_WIDTH 10
 
-static FORM *f_product;
-static FIELD *fields[N_FIELDS];
-char username[50];
-
-int mode = M_POS;
-
-static char* trim_whitespaces(char *str);
-int print(WINDOW *win, int y, int x, const char *fmt, ...);
-void top_refresh();
-void mode_change(int mode);
-static void driver(int ch);
-FIELD * set_field(int height, int width, int toprow, int leftcol, int offscreen, int nbuffers);
-void rectangle(int y1, int x1, int y2, int x2);
-void vertical(int y1, int x1, int y2, int x2);
-void create_form(FIELD *fields[], FORM *form);
-void ticket_render();
-void draw_screen();
-
-/* Función auxiliar para quitar espacios al inicio y al final de una cadena */
-static char* trim_whitespaces(char *str)
-{
-    char *end;
-    while (isspace((unsigned char)*str)) /* Eliminar espacios iniciales */
-        str++;
-
-    if (*str == '\0')  /* Si el string es vacío, retorna inmediatamente */
-        return str;
-
-    end = str + strlen(str) - 1; /* Encontrar el final del string */
-
-    while (end > str && isspace((unsigned char)*end)) /* Eliminar espacios finales */
-        end--;
-
-    *(end+1) = '\0';  /* Agregar terminador nulo */
-    return str;
-}
+const char *labels[NUM_FIELDS] = {
+    "CODE", "ID", "Producto", "Stock", "Fabricante", "Proveedor",
+    "Departamento", "Clase", "Subclase", "Descripción", "Precio", "IVA"
+};
 
 
-int print(WINDOW *win, int y, int x, const char *fmt, ...) {
-    int cur_y, cur_x;
-    getyx(win, cur_y, cur_x);
-    wmove(win, y, x);
-    va_list args;
-    va_start(args, fmt);
-    int ret = vw_printw(win, fmt, args);
-    va_end(args);
-    wmove(win, cur_y, cur_x);
-    return ret;
-}
-
-
-void top_refresh()
-{
-    //clrtoeol();
-    char mode_str[50];
-    switch (mode) {
-        case M_POS:
-            strcpy(mode_str, "POS");
-            break;
-        case M_PRODUCT_EDIT:
-            strcpy(mode_str, "PRODUCT (EDIT)");
-            break;
-        case M_PRODUCT_LIST:
-            strcpy(mode_str, "PRODUCT (LIST)");
-            break;
+/* Obtiene el tamaño de la terminal */
+TerminalSize get_terminal_size(void) {
+    TerminalSize ts = {0, 0};
+#ifdef _WIN32
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (GetConsoleScreenBufferInfo(hStdout, &csbi)) {
+        ts.cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+        ts.rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
     }
-    attron(COLOR_PAIR(4));
-    print(stdscr, 0, 2, "MODE: %-20s", mode_str);
-    print(stdscr, 0, 27, "USER: %-10s", username);
-}
-
-
-void mode_change(int mode)
-{
-    switch (mode) {
-        case M_POS:
-            set_current_field(f_product, fields[0]);
-            form_driver(f_product, REQ_END_LINE);
-            pos_form_cursor(f_product);
-
-            for (int i = 0; fields[i] != NULL; i++)
-            {
-                set_field_opts(fields[i], O_VISIBLE | O_PUBLIC);
-                set_field_fore(fields[i], COLOR_PAIR(2));
-                set_field_back(fields[i], COLOR_PAIR(2));
-            }
-            // CODE (EAN, etc):
-            set_field_fore(fields[0], COLOR_PAIR(6));
-            set_field_back(fields[0], COLOR_PAIR(6));
-            break;
-
-        case M_PRODUCT_LIST:
-        case M_PRODUCT_EDIT:
-            set_current_field(f_product, fields[0]);
-            form_driver(f_product, REQ_END_LINE);
-            pos_form_cursor(f_product);
-
-            for (int i = 0; fields[i] != NULL; i++)
-            {
-                set_field_opts(fields[i], O_VISIBLE | O_PUBLIC | O_EDIT | O_ACTIVE | O_NULLOK);
-                set_field_fore(fields[i], COLOR_PAIR(5));
-                set_field_back(fields[i], COLOR_PAIR(5));
-            }
-            // CODE (EAN, etc):
-            set_field_fore(fields[0], COLOR_PAIR(6));
-            set_field_back(fields[0], COLOR_PAIR(6));
-            // ID:
-            set_field_opts(fields[1], O_VISIBLE | O_PUBLIC);
-            set_field_fore(fields[1], COLOR_PAIR(2));
-            set_field_back(fields[1], COLOR_PAIR(2));
-            break;
-
-        default:
-            break;
-    };
-    refresh();
-}
-
-/* Función de manejo de entrada: procesa las teclas presionadas y
- * actualiza el formulario y la ventana en consecuencia.
- */
-static void driver(int ch)
-{
-    switch (ch) {
-        case KEY_F(2):
-            switch (mode) {
-                case M_POS:
-                    mode = M_PRODUCT_EDIT;
-                    draw_screen();
-                    mode_change(mode);
-                    break;
-
-                case M_PRODUCT_EDIT:
-                    mode = M_PRODUCT_LIST;
-                    draw_screen();
-                    mode_change(mode);
-                    break;
-                
-                case M_PRODUCT_LIST:
-                    mode = M_POS;
-                    draw_screen();
-                    mode_change(mode);
-                    break;
-                
-                default:
-                    break;
-            }
-            
-            break;
-        case KEY_F(5): /* Sincronizar el buffer del campo actual */
-            form_driver(f_product, REQ_NEXT_FIELD);
-            form_driver(f_product, REQ_PREV_FIELD);
-            move(LINES - 3, 2);
-            clrtoeol();
-            for (int i = 0; fields[i] != NULL; i++) {
-                printw("%s", trim_whitespaces(field_buffer(fields[i], 0)));
-                if (field_opts(fields[i]) & O_ACTIVE)
-                    printw("\"\t");
-                else
-                    printw(": \"");
-            }
-            pos_form_cursor(f_product);
-            break;
-
-        case 9:
-        case KEY_DOWN:
-            form_driver(f_product, REQ_NEXT_FIELD);
-            form_driver(f_product, REQ_END_LINE);
-            break;
-
-        case KEY_BTAB:
-        case KEY_UP:
-            form_driver(f_product, REQ_PREV_FIELD);
-            form_driver(f_product, REQ_END_LINE);
-            break;
-
-        case KEY_LEFT:
-            form_driver(f_product, REQ_PREV_CHAR);
-            break;
-
-        case KEY_RIGHT:
-            form_driver(f_product, REQ_NEXT_CHAR);
-            break;
-
-        case KEY_BACKSPACE:
-        case 127:
-            form_driver(f_product, REQ_DEL_PREV);
-            break;
-
-        case KEY_DC:
-            form_driver(f_product, REQ_DEL_CHAR);
-            break;
-
-        default:
-            form_driver(f_product, ch);
-            break;
+#else
+    struct winsize w;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) != -1) {
+        ts.cols = w.ws_col;
+        ts.rows = w.ws_row;
     }
-	refresh();
+#endif
+    return ts;
 }
 
-/* Función para crear y configurar un campo */
-FIELD * set_field(int height, int width, int toprow, int leftcol, int offscreen, int nbuffers)
-{
-    FIELD *field = new_field(height, width, toprow, leftcol, offscreen, nbuffers);
-    set_field_just(field, JUSTIFY_LEFT);
-    field_opts_off(field, O_AUTOSKIP);     // Evitar el avance automático
-    //set_field_buffer(field, 0, "-");
-    return field;
+/* =========================== */
+/* Modo Raw para Unix */
+/* =========================== */
+#ifndef _WIN32
+struct termios orig_termios;
+
+void disable_raw_mode(void) {
+    tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios);
 }
 
-void rectangle(int y1, int x1, int y2, int x2)
-{
-    mvhline(y1, x1, 0, x2-x1);
-    mvhline(y2, x1, 0, x2-x1);
-    mvvline(y1, x1, 0, y2-y1);
-    mvvline(y1, x2, 0, y2-y1);
-    mvaddch(y1, x1, ACS_ULCORNER);
-    mvaddch(y2, x1, ACS_LLCORNER);
-    mvaddch(y1, x2, ACS_URCORNER);
-    mvaddch(y2, x2, ACS_LRCORNER);
+void enable_raw_mode(void) {
+    struct termios raw;
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    raw = orig_termios;
+    raw.c_lflag &= ~(ICANON | ECHO); // deshabilitar entrada canónica y eco
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
 }
+#endif
 
-void vertical(int y1, int x1, int y2, int x2)
-{
-    for (int y = 2; y < LINES - 2; y++) {
-        mvaddch(y, 0, ACS_VLINE);
-        mvaddch(y, COLS / 2, ACS_VLINE);
-        mvaddch(y, COLS - 1, ACS_VLINE);
-    }
+/* =========================== */
+/* Función getch() para capturar un carácter */
+/* =========================== */
+#ifdef _WIN32
+// En Windows usamos _getch() de <conio.h>
+int getch_wrapper(void) {
+    return _getch();
 }
-
-void create_form(FIELD *fields[], FORM *form) 
-{
-    fields[ 0] = set_field(1, 13,  0+Y_FIELDS, X_FIELDS, 0, 1);  // CODE
-    fields[ 1] = set_field(1, 13,  2+Y_FIELDS, X_FIELDS, 0, 1);  // ID
-    fields[ 2] = set_field(1, 40,  3+Y_FIELDS, X_FIELDS, 0, 1);  // Producto
-    fields[ 3] = set_field(1, 10,  4+Y_FIELDS, X_FIELDS, 0, 1);  // Stock
-    fields[ 4] = set_field(1, 40,  6+Y_FIELDS, X_FIELDS, 0, 1);  // Fabricante
-    fields[ 5] = set_field(1, 40,  7+Y_FIELDS, X_FIELDS, 0, 1);  // Proveedor
-    fields[ 6] = set_field(1, 40,  9+Y_FIELDS, X_FIELDS, 0, 1);  // Departamento
-    fields[ 7] = set_field(1, 40, 10+Y_FIELDS, X_FIELDS, 0, 1);  // Clase
-    fields[ 8] = set_field(1, 40, 11+Y_FIELDS, X_FIELDS, 0, 1); // Subclase
-    fields[ 9] = set_field(2, 40, 13+Y_FIELDS, X_FIELDS, 0, 1); // Descripción 1
-    fields[10] = set_field(10,40, 16+Y_FIELDS, X_FIELDS, 0, 1); // Descripción 2
-    fields[11] = set_field(1, 20, 27+Y_FIELDS, X_FIELDS, 0, 1); // Precio 1
-    fields[12] = set_field(1, 20, 28+Y_FIELDS, X_FIELDS, 0, 1); // Precio 2
-    fields[13] = set_field(1, 20, 29+Y_FIELDS, X_FIELDS, 0, 1); // Precio 3
-    fields[14] = set_field(1, 20, 30+Y_FIELDS, X_FIELDS, 0, 1); // Precio 4
-    fields[15] = set_field(1, 20, 32+Y_FIELDS, X_FIELDS, 0, 1); // IVA
-    fields[16] = NULL;
-
-    set_field_fore(fields[ 0], COLOR_PAIR(6) | A_UNDERLINE);
-    set_field_back(fields[ 0], COLOR_PAIR(6) | A_UNDERLINE);
-
-    f_product = new_form(fields);
-    post_form(f_product);
-    refresh();
-}
-
-void ticket_render()
-{
-    attron(COLOR_PAIR(2));
-    mvprintw(Y_TICKET, X_TICKET, "Total: %.2f", 145.5);
-    attron(COLOR_PAIR(4));
-    mvprintw(Y_TICKET, X_TICKET + 20, "[ticket %d]", 987123);
-    refresh();
-}
-
-
-/* Función para crear las ventanas, el formulario y dibujar las etiquetas */
-void draw_screen()
-{
-    clear();
-    top_refresh();
-    attron(COLOR_PAIR(4));
-    rectangle(1, 0, LINES-2, COLS-1);
-    vertical(1, COLS/2, LINES-2, COLS/2);
-    mvaddch(1, COLS/2, ACS_TTEE);
-    mvaddch(LINES - 2, COLS/2, ACS_BTEE);
-
-    attron(COLOR_PAIR(2));
-    mvwprintw(stdscr,  0+Y_FIELDS, 2, "CODE:");
-    attron(COLOR_PAIR(4));
-    mvwprintw(stdscr,  2+Y_FIELDS, 2, "[ID]:");
-    mvwprintw(stdscr,  3+Y_FIELDS, 2, "Producto:");
-    mvwprintw(stdscr,  4+Y_FIELDS, 2, "Stock:");
-    mvwprintw(stdscr,  5+Y_FIELDS, X_FIELDS, "--------");
-    mvwprintw(stdscr,  6+Y_FIELDS, 2, "Fabricante:");
-    mvwprintw(stdscr,  7+Y_FIELDS, 2, "Proveedor:");
-    mvwprintw(stdscr,  8+Y_FIELDS, X_FIELDS, "--------");
-    mvwprintw(stdscr,  9+Y_FIELDS, 2, "Departamento:");
-    mvwprintw(stdscr, 10+Y_FIELDS, 2, "Clase:");
-    mvwprintw(stdscr, 11+Y_FIELDS, 2, "Subclase:");
-    mvwprintw(stdscr, 12+Y_FIELDS, X_FIELDS, "--------");
-    mvwprintw(stdscr, 13+Y_FIELDS, 2, "Descripción 1:");
-    mvwprintw(stdscr, 15+Y_FIELDS, X_FIELDS, "--------");
-    mvwprintw(stdscr, 16+Y_FIELDS, 2, "Descripción 2:");
-    mvwprintw(stdscr, 26+Y_FIELDS, X_FIELDS, "--------");
-    mvwprintw(stdscr, 27+Y_FIELDS, 2, "Precio 1:");
-    mvwprintw(stdscr, 28+Y_FIELDS, 2, "Precio 2:");
-    mvwprintw(stdscr, 29+Y_FIELDS, 2, "Precio 3:");
-    mvwprintw(stdscr, 30+Y_FIELDS, 2, "Precio 4:");
-    mvwprintw(stdscr, 31+Y_FIELDS, X_FIELDS, "--------");
-    mvwprintw(stdscr, 32+Y_FIELDS, 2, "IVA:");
-
-    attron(COLOR_PAIR(2));
-    mvwprintw(stdscr, LINES-1, 1, "F1: Quit F2: Mode");
-
-    ticket_render();
-    refresh();
-}
-
-
-int main(void)
-{
+#else
+// En Unix implementamos getch usando termios
+int getch_wrapper(void) {
     int ch;
-    strcpy(username, "guest");
-    /* Inicialización de ncurses */
-    initscr();
-    cbreak();
-    noecho();
-    keypad(stdscr, TRUE);
-    start_color();
+    ch = getchar();
+    return ch;
+}
+#endif
 
-    /* Definir algunos colores (paleta retro) */
-    init_color(COLOR_GREEN, 152 * 1000 / 256, 229 * 1000 / 256, 165 * 1000 / 256);
-    init_color(COLOR_RED,   107 * 1000 / 256, 148 * 1000 / 256, 108 * 1000 / 256);
-    init_color(COLOR_YELLOW, 56 * 1000 / 256, 152 * 1000 / 256,  68 * 1000 / 256);
-    init_color(COLOR_BLUE,    0 * 1000 / 256,  66 * 1000 / 256,  15 * 1000 / 256);
-    init_color(COLOR_MAGENTA,12 * 1000 / 256,  32 * 1000 / 256,  13 * 1000 / 256);
+/* =========================== */
+/* Funciones para manejo ANSI  */
+/* =========================== */
 
-    init_pair(1, COLOR_GREEN,  COLOR_BLACK);
-    init_pair(2, COLOR_RED,    COLOR_BLACK);
-    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(4, COLOR_BLUE,   COLOR_BLACK);
-    init_pair(5, COLOR_RED,    COLOR_MAGENTA);
-    init_pair(6, COLOR_YELLOW, COLOR_BLUE);
+/* Habilita el procesamiento de secuencias ANSI en Windows */
+void enable_ansi_escape_codes(void) {
+#ifdef _WIN32
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hOut == INVALID_HANDLE_VALUE)
+        return;
+    
+    DWORD dwMode = 0;
+    if (!GetConsoleMode(hOut, &dwMode))
+        return;
+    
+    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    SetConsoleMode(hOut, dwMode);
+#endif
+}
 
-    create_form(fields, f_product);
-    draw_screen();
-    mode_change(mode);
-    /* Bucle principal: se procesa la entrada */
-    while ((ch = getch()) != KEY_F(1))
-        driver(ch);
+/* Limpia la pantalla y posiciona el cursor en la esquina superior izquierda */
+void clear_screen(void) {
+    printf("\033[2J\033[H");
+}
 
-    /* Liberar recursos */
-    unpost_form(f_product);
-    free_form(f_product);
-    for (int i = 0; fields[i] != NULL; i++)
-        free_field(fields[i]);        
-    endwin();
+/* Posiciona el cursor en la fila 'row' y columna 'col' (1-indexado) */
+void gotoxy(int row, int col) {
+    printf("\033[%d;%dH", row, col);
+}
+
+/* =========================== */
+/* Funciones para manejo de colores */
+/* =========================== */
+
+/* --- Colores Básicos (0-7) --- */
+void set_foreground_color(int color) {
+    printf("\033[3%dm", color);
+}
+
+void set_background_color(int color) {
+    printf("\033[4%dm", color);
+}
+
+void set_colors(int fg, int bg) {
+    set_foreground_color(fg);
+    set_background_color(bg);
+}
+
+/* --- Paleta de 256 Colores --- */
+void set_foreground_color256(int color) {
+    printf("\033[38;5;%dm", color);
+}
+
+void set_background_color256(int color) {
+    printf("\033[48;5;%dm", color);
+}
+
+void set_colors256(int fg, int bg) {
+    set_foreground_color256(fg);
+    set_background_color256(bg);
+}
+
+/* --- Colores Verdaderos (RGB) --- */
+void set_foreground_rgb(int r, int g, int b) {
+    printf("\033[38;2;%d;%d;%dm", r, g, b);
+}
+
+void set_background_rgb(int r, int g, int b) {
+    printf("\033[48;2;%d;%d;%dm", r, g, b);
+}
+
+void set_colors_rgb(int r_fg, int g_fg, int b_fg, int r_bg, int g_bg, int b_bg) {
+    set_foreground_rgb(r_fg, g_fg, b_fg);
+    set_background_rgb(r_bg, g_bg, b_bg);
+}
+
+void reset_colors(void) {
+    printf("\033[0m");
+}
+
+/* =========================== */
+/* Funciones para manejo del cursor */
+/* =========================== */
+void hide_cursor(void) {
+    printf("\033[?25l");
+}
+
+void show_cursor(void) {
+    printf("\033[?25h");
+}
+
+/* =========================== */
+/* Funciones para dibujo de UI */
+/* =========================== */
+void draw_box(int x1, int y1, int x2, int y2) {
+    int i, j;
+    gotoxy(y1, x1);
+    printf("┌");
+    for (i = x1 + 1; i < x2; i++) {
+        printf("─");
+    }
+    printf("┐");
+    for (j = y1 + 1; j < y2; j++) {
+        gotoxy(j, x1);
+        printf("│");
+        gotoxy(j, x2);
+        printf("│");
+    }
+    gotoxy(y2, x1);
+    printf("└");
+    for (i = x1 + 1; i < x2; i++) {
+        printf("─");
+    }
+    printf("┘");
+}
+
+/* =========================== */
+/* Funciones para campos de texto */
+/* =========================== */
+
+/* Estructura para representar un campo de texto.
+ * Se agregó 'cursor' para almacenar la posición de edición dentro del buffer.
+ */
+typedef struct {
+    int row;      // Fila donde se ubica el campo (1-indexado)
+    int col;      // Columna donde se ubica el campo (1-indexado)
+    int width;    // Ancho visible del campo (en caracteres)
+    int maxlen;   // Longitud máxima permitida para la entrada
+    char *buffer; // Buffer que almacena el contenido del campo
+    int cursor;   // Posición actual del cursor en el buffer (0-indexado)
+    const char *label; // Etiqueta del campo (a la izquierda)
+} TextField;
+
+TextField *create_text_field(int row, int col, int width, int maxlen, const char *label) {
+    TextField *tf = malloc(sizeof(TextField));
+    if (!tf) return NULL;
+    tf->row = row;
+    tf->col = col;
+    tf->width = width;
+    tf->maxlen = maxlen;
+    tf->buffer = calloc(maxlen + 1, sizeof(char));
+    tf->cursor = 0;
+    tf->label = label;
+    return tf;
+}
+
+/* Dibuja el campo de texto con subrayado.
+ * Se imprime el contenido rellenado hasta 'width' caracteres.
+ */
+void draw_text_field(TextField *tf) {
+    if (!tf) return;
+    gotoxy(tf->row, tf->col);
+    printf("%-10s", tf->label);
+
+    gotoxy(tf->row, tf->col + FIELD_LABEL_WIDTH);
+    printf("\033[4m"); // activa subrayado
+    printf("%-*s", tf->width, tf->buffer);
+    printf("\033[0m"); // desactiva atributos
+    fflush(stdout);
+}
+
+/* Edita el campo de texto permitiendo mover el cursor con las flechas.
+ * Se captura carácter a carácter hasta que se presione Enter.
+ */
+void edit_text_field(TextField *tf) {
+    if (!tf) return;
+    
+    // En sistemas Unix, habilitar modo raw para capturar cada tecla sin esperar Enter
+#ifndef _WIN32
+    enable_raw_mode();
+#endif
+
+    // Cambiar color para indicar edición (ejemplo: texto blanco sobre fondo azul oscuro)
+    set_colors_rgb(255, 255, 255, 0, 0, 128);
+    // Activar subrayado para el área de edición
+    printf("\033[4m");
+    fflush(stdout);
+    
+    int ch;
+    while (1) {
+        ch = getch_wrapper();
+        if (ch == '\r' || ch == '\n') {
+            // Finaliza la edición con Enter
+            break;
+        }
+        else if (ch == 127 || ch == 8) { 
+            // Backspace: eliminar carácter anterior si existe
+            if (tf->cursor > 0) {
+                int len = strlen(tf->buffer);
+                for (int i = tf->cursor - 1; i < len; i++) {
+                    tf->buffer[i] = tf->buffer[i + 1];
+                }
+                tf->cursor--;
+            }
+        }
+        else if (ch == 27) {
+            // Secuencia de escape: posiblemente una tecla de flecha
+            int ch2 = getch_wrapper();
+            if (ch2 == '[') {
+                int ch3 = getch_wrapper();
+                if (ch3 == 'C') {
+                    // Flecha derecha
+                    if (tf->cursor < (int)strlen(tf->buffer))
+                        tf->cursor++;
+                }
+                else if (ch3 == 'D') {
+                    // Flecha izquierda
+                    if (tf->cursor > 0)
+                        tf->cursor--;
+                }
+                // Se pueden agregar casos para flechas arriba/abajo si se desea
+            }
+        }
+        else if (ch >= 32 && ch <= 126) {
+            // Carácter imprimible: inserción en la posición actual
+            int len = strlen(tf->buffer);
+            if (len < tf->maxlen) {
+                // Desplazar a la derecha desde la posición actual
+                for (int i = len; i >= tf->cursor; i--) {
+                    tf->buffer[i+1] = tf->buffer[i];
+                }
+                tf->buffer[tf->cursor] = (char)ch;
+                tf->cursor++;
+            }
+        }
+        
+        // Actualiza el campo en pantalla
+        draw_text_field(tf);
+        // Reposiciona el cursor en la posición actual dentro del campo
+        gotoxy(tf->row, tf->col + tf->cursor + FIELD_LABEL_WIDTH);
+        fflush(stdout);
+    }
+    
+    // Finaliza la edición: restablece atributos
+#ifndef _WIN32
+    disable_raw_mode();
+#endif
+    reset_colors();
+    draw_text_field(tf);
+}
+
+/* Libera la memoria asignada al campo de texto */
+void free_text_field(TextField *tf) {
+    if (tf) {
+        free(tf->buffer);
+        free(tf);
+    }
+}
+
+/* =========================== */
+/* Funciones de la UI          */
+/* =========================== */
+
+/* Actualiza la interfaz principal adaptándola al tamaño de la terminal */
+void update_ui(TextField *tf) {
+    TerminalSize ts = get_terminal_size();
+    
+    clear_screen();
+    hide_cursor();
+    
+    /* Dibuja un recuadro que abarque toda la terminal */
+    draw_box(1, 1, ts.cols, ts.rows);
+    
+    /* Título en la parte superior */
+    gotoxy(2, 3);
+    set_foreground_color(2);  // Verde (color básico)
+    printf("Mi Aplicación de UI de Texto (Tamaño: %d x %d)", ts.cols, ts.rows);
+    reset_colors();
+    
+    /* Instrucciones justo debajo del título */
+    gotoxy(4, 3);
+    printf("Comandos: 'e' - Editar campo, 'q' - Salir");
+    
+    /* Ubica el campo de texto en el centro horizontal y a 1/3 vertical */
+    int field_row = ts.rows / 3;
+    int field_col = (ts.cols - tf->width) / 2;
+    tf->row = field_row;
+    tf->col = field_col;
+    draw_text_field(tf);
+    
+    /* Posiciona el cursor en la zona de comandos (parte inferior) */
+    gotoxy(ts.rows - 2, 3);
+    fflush(stdout);
+    show_cursor();
+}
+
+/* Procesa la entrada de comandos: 'e' para editar y 'q' para salir */
+int process_input(TextField *tf) {
+    char command[100];
+    TerminalSize ts = get_terminal_size();
+    
+    gotoxy(ts.rows - 2, 3);
+    printf("Ingrese comando: ");
+    fflush(stdout);
+    
+    if (fgets(command, sizeof(command), stdin) == NULL)
+        return 1;  // fin o error
+    
+    command[strcspn(command, "\n")] = '\0';
+    
+    if (strcmp(command, "q") == 0 || strcmp(command, "Q") == 0)
+        return 1;
+    else if (strcmp(command, "e") == 0 || strcmp(command, "E") == 0)
+        edit_text_field(tf);
+    
+    return 0;
+}
+
+/* =========================== */
+/* Función principal           */
+/* =========================== */
+int main(void) {
+    int exit_requested = 0;
+    
+    enable_ansi_escape_codes();
+    
+    /* Crear un campo de texto con ancho de 30 y máximo 100 caracteres.
+     * La posición se ajusta en update_ui().
+     */
+    TextField *tf = create_text_field(0, 0, 30, 100, "Prueba");
+    
+    while (!exit_requested) {
+        update_ui(tf);
+        exit_requested = process_input(tf);
+    }
+    
+    clear_screen();
+    show_cursor();
+    free_text_field(tf);
+    
     return 0;
 }

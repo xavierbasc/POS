@@ -11,8 +11,8 @@
                 "-o",
                 "pos",
                 //"-lnotcurses"
-                "-lncurses",
-                "-lform"
+                //"-lncurses",
+                //"-lform"
                 // Si ncurses está en una ruta personalizada, por ejemplo:
                 // "-I/usr/local/opt/ncurses/include",
                 // "-L/usr/local/opt/ncurses/lib"
