@@ -11,6 +11,7 @@
         "locale": "c",
         "stdbool.h": "c",
         "string.h": "c",
-        "stdarg.h": "c"
+        "stdarg.h": "c",
+        "cmath": "c"
     }
 }
